@@ -34,7 +34,7 @@ def process_pdf_folder(folder_path):
     raw_text = get_pdf_text_from_folder(folder_path)
     text_chunks = get_text_chunks(raw_text)
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    vector_store = FAISS.from_texts(chunks=text_chunks, embedding=embeddings)
+    vector_store = FAISS.from_texts(texts=text_chunks, embedding=embeddings)  # Corrected argument
     vector_store.save_local("faiss_index")
     return vector_store
 
