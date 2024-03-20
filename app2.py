@@ -29,17 +29,19 @@ def get_text_chunks(text):
     chunks = splitter.split_text(text)
     return chunks
 
-@st.cache(allow_output_mutation=True, hash_funcs={FAISS: id})
-def get_vector_store(chunks):
+@st.cache_data
+def process_pdf_folder(folder_path):
+    raw_text = get_pdf_text_from_folder(folder_path)
+    text_chunks = get_text_chunks(raw_text)
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    vector_store = FAISS.from_texts(chunks, embedding=embeddings)
+    vector_store = FAISS.from_texts(chunks=text_chunks, embedding=embeddings)
     vector_store.save_local("faiss_index")
     return vector_store
 
 def get_conversational_chain():
     prompt_template = """
     Answer the question as detailed as possible from the provided context, make sure to provide all the details, if the answer is not in
-    provided context just say, "answer is not available in the context", don't provide the wrong answer\n\n
+    provided context just say, 'answer is not available in the context', don't provide the wrong answer\n\n
     Context:\n {context}?\n
     Question: \n{question}\n
 
@@ -58,15 +60,13 @@ def user_input(user_question, vector_store):
     return response
 
 def main():
-    st.set_page_config(page_title="Chat with Carnegie AI")
+    st.set_page_config(page_title="Learn about Carnegie")
     pdf_folder_path = 'docs'
     if 'vector_store' not in st.session_state or not os.path.exists("faiss_index"):
-        raw_text = get_pdf_text_from_folder(pdf_folder_path)
-        text_chunks = get_text_chunks(raw_text)
-        st.session_state['vector_store'] = get_vector_store(text_chunks)
+        st.session_state['vector_store'] = process_pdf_folder(pdf_folder_path)
 
     st.title("Learn about Carnegie")
-    st.write("Chat with Carnegie AI")
+    st.write("Chat with Carnegie AI!")
     if "messages" not in st.session_state:
         st.session_state['messages'] = []
 
