@@ -58,14 +58,14 @@ def user_input(user_question):
     return response
 
 def main():
-    st.set_page_config(page_title="Gemini PDF Chatbot", page_icon="🤖")
+    st.set_page_config(page_title="Carnegie Interactive Resource Chat")
     pdf_folder_path = 'docs'
     raw_text = get_pdf_text_from_folder(pdf_folder_path)
     text_chunks = get_text_chunks(raw_text)
     get_vector_store(text_chunks)
 
-    st.title("Chat with PDF files using Gemini🤖")
-    st.write("Welcome to the chat!")
+    st.title("Carnegie Interactive Resource Chat")
+    st.write("Please ask about Carnegie!")
     if "messages" not in st.session_state:
         st.session_state['messages'] = []
 
