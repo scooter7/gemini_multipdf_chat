@@ -29,10 +29,12 @@ def get_text_chunks(text):
     chunks = splitter.split_text(text)
     return chunks
 
+@st.cache(allow_output_mutation=True, hash_funcs={FAISS: id})
 def get_vector_store(chunks):
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     vector_store = FAISS.from_texts(chunks, embedding=embeddings)
     vector_store.save_local("faiss_index")
+    return vector_store
 
 def get_conversational_chain():
     prompt_template = """
@@ -48,24 +50,23 @@ def get_conversational_chain():
     chain = load_qa_chain(llm=model, chain_type="stuff", prompt=prompt)
     return chain
 
-def user_input(user_question):
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
+def user_input(user_question, vector_store):
+    new_db = FAISS.load_local("faiss_index", vector_store.embeddings, allow_dangerous_deserialization=True)
     docs = new_db.similarity_search(user_question)
     chain = get_conversational_chain()
     response = chain({"input_documents": docs, "question": user_question}, return_only_outputs=True)
-    print(response)
     return response
 
 def main():
-    st.set_page_config(page_title="Carnegie Interactive Resource Chat")
+    st.set_page_config(page_title="Chat with Carnegie AI")
     pdf_folder_path = 'docs'
-    raw_text = get_pdf_text_from_folder(pdf_folder_path)
-    text_chunks = get_text_chunks(raw_text)
-    get_vector_store(text_chunks)
+    if 'vector_store' not in st.session_state or not os.path.exists("faiss_index"):
+        raw_text = get_pdf_text_from_folder(pdf_folder_path)
+        text_chunks = get_text_chunks(raw_text)
+        st.session_state['vector_store'] = get_vector_store(text_chunks)
 
-    st.title("Carnegie Interactive Resource Chat")
-    st.write("Please ask about Carnegie!")
+    st.title("Learn about Carnegie")
+    st.write("Chat with Carnegie AI")
     if "messages" not in st.session_state:
         st.session_state['messages'] = []
 
@@ -75,7 +76,7 @@ def main():
 
     if prompt := st.chat_input():
         st.session_state.messages.append({"role": "user", "content": prompt})
-        response = user_input(prompt)
+        response = user_input(prompt, st.session_state['vector_store'])
         if response is not None:
             full_response = ''.join(response['output_text'])
             st.session_state.messages.append({"role": "assistant", "content": full_response})
