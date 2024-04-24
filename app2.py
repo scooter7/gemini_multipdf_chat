@@ -27,7 +27,7 @@ def get_pdf_text_from_folder(folder_path):
     return text
 
 def get_text_chunks(text):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     return splitter.split_text(text)
 
 @st.cache_data
@@ -54,7 +54,7 @@ def get_conversational_chain():
 
 def user_input(user_question, vector_store):
     new_db = FAISS.load_local("faiss_index", vector_store.embeddings, allow_dangerous_deserialization=True)
-    docs = new_db.similarity_search(user_question, top_k=10)
+    docs = new_db.similarity_search(user_question, top_k=50)
     chain = get_conversational_chain()
     return chain({"input_documents": docs, "question": user_question}, return_only_outputs=True)
 
