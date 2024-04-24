@@ -1,6 +1,4 @@
-import io
 import os
-import requests
 from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
@@ -16,39 +14,27 @@ load_dotenv()
 os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-def fetch_pdfs_from_github(repo_url):
-    contents_url = f"https://github.com/scooter7/gemini_multipdf_chat/tree/main/docs"
-    response = requests.get(contents_url)
-    files = response.json()
-    texts = []
-    for file in files:
-        if file['name'].endswith('.pdf'):
-            download_url = file['download_url']
-            pdf_response = requests.get(download_url)
-            pdf_file = io.BytesIO(pdf_response.content)
-            pdf_reader = PdfReader(pdf_file)
-            text = ""
+def get_pdf_text_from_folder(folder_path):
+    text = ""
+    for file_name in os.listdir(folder_path):
+        if file_name.endswith('.pdf'):
+            pdf_path = os.path.join(folder_path, file_name)
+            pdf_reader = PdfReader(pdf_path)
             for page in pdf_reader.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text
-            texts.append(text)
-    return texts
+                text += page.extract_text() if page.extract_text() else ""
+    return text
 
-def get_text_chunks(texts):
+def get_text_chunks(text):
     splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
-    all_chunks = []
-    for text in texts:
-        chunks = splitter.split_text(text)
-        all_chunks.extend(chunks)
-    return all_chunks
+    chunks = splitter.split_text(text)
+    return chunks
 
 @st.cache_data
-def process_pdfs_from_github(repo_url):
-    texts = fetch_pdfs_from_github(repo_url)
-    text_chunks = get_text_chunks(texts)
+def process_pdf_folder(folder_path):
+    raw_text = get_pdf_text_from_folder(folder_path)
+    text_chunks = get_text_chunks(raw_text)
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    vector_store = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
+    vector_store = FAISS.from_texts(texts=text_chunks, embedding=embeddings)  # Corrected argument
     vector_store.save_local("faiss_index")
     return vector_store
 
@@ -63,7 +49,8 @@ def get_conversational_chain():
     """
     model = ChatGoogleGenerativeAI(model="gemini-pro", client=genai, temperature=0.3)
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
-    return load_qa_chain(llm=model, chain_type="stuff", prompt=prompt)
+    chain = load_qa_chain(llm=model, chain_type="stuff", prompt=prompt)
+    return chain
 
 def user_input(user_question, vector_store):
     new_db = FAISS.load_local("faiss_index", vector_store.embeddings, allow_dangerous_deserialization=True)
@@ -74,9 +61,9 @@ def user_input(user_question, vector_store):
 
 def main():
     st.set_page_config(page_title="Learn about Carnegie")
-    repo_url = 'scooter7/gemini_multipdf_chat'
+    pdf_folder_path = 'docs'
     if 'vector_store' not in st.session_state or not os.path.exists("faiss_index"):
-        st.session_state['vector_store'] = process_pdfs_from_github(repo_url)
+        st.session_state['vector_store'] = process_pdf_folder(pdf_folder_path)
 
     st.title("Learn about Carnegie")
     st.write("Chat with Carnegie AI!")
