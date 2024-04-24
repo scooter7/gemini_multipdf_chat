@@ -27,7 +27,7 @@ def get_pdf_text_from_folder(folder_path):
     return text
 
 def get_text_chunks(text):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500)  # Adjusted for better context retention
+    splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500)
     return splitter.split_text(text)
 
 @st.cache_data
@@ -35,7 +35,7 @@ def process_pdf_folder(folder_path):
     raw_text = get_pdf_text_from_folder(folder_path)
     text_chunks = get_text_chunks(raw_text)
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    vector_store = FAISS.from_texts(texts=text_chunks, embedding=embeddings, index_factory="Flat")  # Specifying index type for clarity
+    vector_store = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
     vector_store.save_local("faiss_index")
     return vector_store
 
@@ -54,7 +54,7 @@ def get_conversational_chain():
 
 def user_input(user_question, vector_store):
     new_db = FAISS.load_local("faiss_index", vector_store.embeddings, allow_dangerous_deserialization=True)
-    docs = new_db.similarity_search(user_question, top_k=10)  # Increasing returned documents for broader context
+    docs = new_db.similarity_search(user_question, top_k=10)
     chain = get_conversational_chain()
     return chain({"input_documents": docs, "question": user_question}, return_only_outputs=True)
 
