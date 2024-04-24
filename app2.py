@@ -17,7 +17,7 @@ os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 def fetch_pdfs_from_github(repo_url):
-    contents_url = f"https://api.github.com/repos/{repo_url}/contents/docs"
+    contents_url = f"https://github.com/scooter7/gemini_multipdf_chat/tree/main/docs"
     response = requests.get(contents_url)
     files = response.json()
     texts = []
