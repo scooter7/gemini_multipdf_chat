@@ -21,20 +21,21 @@ def get_pdf_text_from_folder(folder_path):
             pdf_path = os.path.join(folder_path, file_name)
             pdf_reader = PdfReader(pdf_path)
             for page in pdf_reader.pages:
-                text += page.extract_text() if page.extract_text() else ""
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
     return text
 
 def get_text_chunks(text):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
-    chunks = splitter.split_text(text)
-    return chunks
+    splitter = RecursiveCharacterTextSplitter(chunk_size=5000, chunk_overlap=500)  # Adjusted for better context retention
+    return splitter.split_text(text)
 
 @st.cache_data
 def process_pdf_folder(folder_path):
     raw_text = get_pdf_text_from_folder(folder_path)
     text_chunks = get_text_chunks(raw_text)
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    vector_store = FAISS.from_texts(texts=text_chunks, embedding=embeddings)  # Corrected argument
+    vector_store = FAISS.from_texts(texts=text_chunks, embedding=embeddings, index_factory="Flat")  # Specifying index type for clarity
     vector_store.save_local("faiss_index")
     return vector_store
 
@@ -49,15 +50,13 @@ def get_conversational_chain():
     """
     model = ChatGoogleGenerativeAI(model="gemini-pro", client=genai, temperature=0.3)
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
-    chain = load_qa_chain(llm=model, chain_type="stuff", prompt=prompt)
-    return chain
+    return load_qa_chain(llm=model, chain_type="stuff", prompt=prompt)
 
 def user_input(user_question, vector_store):
     new_db = FAISS.load_local("faiss_index", vector_store.embeddings, allow_dangerous_deserialization=True)
-    docs = new_db.similarity_search(user_question)
+    docs = new_db.similarity_search(user_question, top_k=10)  # Increasing returned documents for broader context
     chain = get_conversational_chain()
-    response = chain({"input_documents": docs, "question": user_question}, return_only_outputs=True)
-    return response
+    return chain({"input_documents": docs, "question": user_question}, return_only_outputs=True)
 
 def main():
     st.set_page_config(page_title="Learn about Carnegie")
