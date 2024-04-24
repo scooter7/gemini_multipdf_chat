@@ -27,7 +27,7 @@ def get_pdf_text_from_folder(folder_path):
     return text
 
 def get_text_chunks(text):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=20000, chunk_overlap=5000)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=15000, chunk_overlap=5000)
     chunks = splitter.split_text(text)
     return chunks
 
