@@ -8,13 +8,11 @@ from langchain.vectorstores import FAISS
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
-from dotenv import load_dotenv
 import requests
 import fitz  # PyMuPDF
 
-load_dotenv()
-os.getenv("GOOGLE_API_KEY")
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+# Configure Google API key from Streamlit secrets
+genai.configure(api_key=st.secrets["google_api_key"])
 
 def fetch_pdfs_from_github(repo_url):
     response = requests.get(repo_url)
