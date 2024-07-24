@@ -103,7 +103,7 @@ def main():
                 st.success("Done")
 
     # Main content area for displaying chat messages
-    st.title("Chat with PDF files using Gemini🤖")
+    st.title("Summarize and ask questions about RFPs)
     st.write("Welcome to the chat!")
     st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
 
