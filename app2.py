@@ -1,49 +1,61 @@
 import os
-import io
-import requests
 from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import streamlit as st
 import google.generativeai as genai
-from langchain_community.vectorstores import FAISS  # Updated import
+from langchain.vectorstores import FAISS
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
+import requests
+import fitz  # PyMuPDF
 
 load_dotenv()
 os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-def get_pdf_text_from_folder(folder_path):
+def fetch_pdfs_from_github(repo_url):
+    response = requests.get(repo_url)
+    pdf_urls = []
+    if response.status_code == 200:
+        content = response.json()
+        for file_info in content:
+            if file_info['name'].endswith('.pdf'):
+                pdf_urls.append(file_info['download_url'])
+    return pdf_urls
+
+def extract_text_from_pdf(url):
+    response = requests.get(url)
+    document = fitz.open(stream=response.content, filetype="pdf")
     text = ""
-    for file_name in os.listdir(folder_path):
-        if file_name.endswith('.pdf'):
-            pdf_path = os.path.join(folder_path, file_name)
-            pdf_reader = PdfReader(pdf_path)
-            for page in pdf_reader.pages:
-                text += page.extract_text() if page.extract_text() else ""
+    for page in document:
+        text += page.get_text()
+    return text
+
+def get_pdf_text(pdf_docs):
+    text = ""
+    for pdf in pdf_docs:
+        pdf_reader = PdfReader(pdf)
+        for page in pdf_reader.pages:
+            text += page.extract_text()
     return text
 
 def get_text_chunks(text):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=15000, chunk_overlap=5000)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
     chunks = splitter.split_text(text)
     return chunks
 
-@st.cache_data
-def process_pdf_folder(folder_path):
-    raw_text = get_pdf_text_from_folder(folder_path)
-    text_chunks = get_text_chunks(raw_text)
+def get_vector_store(chunks):
     embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    vector_store = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
+    vector_store = FAISS.from_texts(chunks, embedding=embeddings)
     vector_store.save_local("faiss_index")
-    return vector_store
 
 def get_conversational_chain():
     prompt_template = """
     Answer the question as detailed as possible from the provided context, make sure to provide all the details, if the answer is not in
-    provided context just say, 'answer is not available in the context', don't provide the wrong answer\n\n
+    provided context just say, "answer is not available in the context", don't provide the wrong answer\n\n
     Context:\n {context}?\n
     Question: \n{question}\n
     Answer:
@@ -53,23 +65,40 @@ def get_conversational_chain():
     chain = load_qa_chain(llm=model, chain_type="stuff", prompt=prompt)
     return chain
 
-def user_input(user_question, vector_store):
-    new_db = FAISS.load_local("faiss_index", vector_store.embeddings, allow_dangerous_deserialization=True)
+def clear_chat_history():
+    st.session_state.messages = [
+        {"role": "assistant", "content": "upload an RFP and ask about scope, due dates, anything you'd like..."}
+    ]
+
+def user_input(user_question):
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
     docs = new_db.similarity_search(user_question)
     chain = get_conversational_chain()
-    response = chain.invoke({"input_documents": docs, "question": user_question}, return_only_outputs=True)  # Use invoke here if necessary
+    response = chain({"input_documents": docs, "question": user_question}, return_only_outputs=True)
     return response
 
 def main():
-    st.set_page_config(page_title="Learn about Carnegie")
-    pdf_folder_path = 'docs'
-    if 'vector_store' not in st.session_state or not os.path.exists("faiss_index"):
-        st.session_state['vector_store'] = process_pdf_folder(pdf_folder_path)
+    st.set_page_config(page_title="RFP Summarization Bot")
 
-    st.title("Learn about Carnegie")
-    st.write("Chat with Carnegie AI!")
-    if "messages" not in st.session_state:
-        st.session_state['messages'] = []
+    repo_url = 'https://api.github.com/repos/scooter7/gemini_multipdf_chat/contents/docs'
+    pdf_urls = fetch_pdfs_from_github(repo_url)
+    pdf_texts = {url: extract_text_from_pdf(url) for url in pdf_urls}
+
+    st.title("PDF Query App")
+
+    query = st.text_input("Enter your query")
+    if query:
+        st.write(f"Results for query: {query}")
+        for url, text in pdf_texts.items():
+            if query.lower() in text.lower():
+                st.write(f"**PDF URL:** {url}")
+                st.write(text[:500])
+
+    if "messages" not in st.session_state.keys():
+        st.session_state.messages = [
+            {"role": "assistant", "content": "upload an RFP and ask about scope, due dates, anything you'd like..."}
+        ]
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
@@ -77,12 +106,22 @@ def main():
 
     if prompt := st.chat_input():
         st.session_state.messages.append({"role": "user", "content": prompt})
-        response = user_input(prompt, st.session_state['vector_store'])
+        with st.chat_message("user"):
+            st.write(prompt)
+
+    if st.session_state.messages[-1]["role"] != "assistant":
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                response = user_input(prompt)
+                placeholder = st.empty()
+                full_response = ''
+                for item in response['output_text']:
+                    full_response += item
+                    placeholder.markdown(full_response)
+                placeholder.markdown(full_response)
         if response is not None:
-            full_response = ''.join(response['output_text'])
-            st.session_state.messages.append({"role": "assistant", "content": full_response})
-            with st.chat_message("assistant"):
-                st.markdown(full_response)
+            message = {"role": "assistant", "content": full_response}
+            st.session_state.messages.append(message)
 
 if __name__ == "__main__":
     main()
