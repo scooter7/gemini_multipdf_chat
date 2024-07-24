@@ -8,10 +8,10 @@ from langchain.vectorstores import FAISS
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
+from dotenv import load_dotenv
 import requests
-import fitz  # PyMuPDF
 
-# Configure Google API key from Streamlit secrets
+load_dotenv()
 genai.configure(api_key=st.secrets["google_api_key"])
 
 def fetch_pdfs_from_github(repo_url):
@@ -26,10 +26,13 @@ def fetch_pdfs_from_github(repo_url):
 
 def extract_text_from_pdf(url):
     response = requests.get(url)
-    document = fitz.open(stream=response.content, filetype="pdf")
+    with open("temp.pdf", "wb") as f:
+        f.write(response.content)
+    pdf_reader = PdfReader("temp.pdf")
     text = ""
-    for page in document:
-        text += page.get_text()
+    for page in pdf_reader.pages:
+        text += page.extract_text()
+    os.remove("temp.pdf")
     return text
 
 def get_pdf_text(pdf_docs):
