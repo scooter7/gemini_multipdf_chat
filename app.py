@@ -66,7 +66,7 @@ def get_conversational_chain():
 
 def clear_chat_history():
     st.session_state.messages = [
-        {"role": "assistant", "content": "upload some pdfs and ask me a question"}]
+        {"role": "assistant", "content": "upload an RFP and ask about scope, due dates, anything you'd like..."}]
 
 
 def user_input(user_question):
