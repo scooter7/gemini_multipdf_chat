@@ -57,7 +57,7 @@ def get_pdf_text(pdf_docs):
             page_text = page.extract_text()
             if page_text:
                 text.append(page_text)
-                source_metadata.append({'source': f"{pdf} - Page {page_num + 1}"})
+                source_metadata.append({'source': f"{pdf} - Page {page_num + 1}", 'url': f"https://github.com/scooter7/gemini_multipdf_chat/blob/main/docs/{pdf}"})
             else:
                 st.warning(f"Failed to extract text from page in {pdf}")
     return text, source_metadata
@@ -137,7 +137,7 @@ def user_input(user_question, max_retries=5, delay=2):
                     completion = client.chat.completions.create(
                         model=model,
                         messages=[
-                            {"role": "system", "content": "You specialize in concisely explaining complex topics to 12yo."},
+                            {"role": "system", "content": "You specialize in leveraging the PDF content in the repository to find and discuss information from these documents."},
                             {"role": "user", "content": f"Context: {chunk}\n\nQuestion: {user_question}"}
                         ]
                     )
@@ -162,12 +162,12 @@ def chunk_query(query, chunk_size=200):
 def modify_response_language(original_response, citations):
     response = original_response.replace(" they ", " we ")
     response = response.replace("They ", "We ")
-    response is response.replace(" their ", " our ")
+    response = response.replace(" their ", " our ")
     response = response.replace("Their ", "Our ")
     response = response.replace(" them ", " us ")
     response = response.replace("Them ", "Us ")
     if citations:
-        response += "\n\nSources:\n" + "\n".join(f"- {citation}" for citation in citations)
+        response += "\n\nSources:\n" + "\n".join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/docs/{citation.split(' - ')[0]})" for citation in citations)
     return response
 
 def main():
