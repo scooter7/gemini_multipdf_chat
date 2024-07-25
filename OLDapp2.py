@@ -57,7 +57,7 @@ def get_pdf_text(pdf_docs):
             page_text = page.extract_text()
             if page_text:
                 text.append(page_text)
-                source_metadata.append({'source': f"{pdf} - Page {page_num + 1}"})
+                source_metadata.append({'source': f"{pdf} - Page {page_num + 1}", 'url': f"https://github.com/scooter7/gemini_multipdf_chat/blob/main/docs/{pdf}"})
             else:
                 st.warning(f"Failed to extract text from page in {pdf}")
     return text, source_metadata
@@ -109,7 +109,7 @@ def get_conversational_chain():
 
 def clear_chat_history():
     st.session_state.messages = [
-        {"role": "assistant", "content": "Query the RFP repository and ask about scope, due dates, anything you'd like..."}]
+        {"role": "assistant", "content": "Find and engage with past Carnegie proposals."}]
 
 def user_input(user_question, max_retries=5, delay=2):
     vector_store = load_or_create_vector_store([], [])
@@ -137,7 +137,7 @@ def user_input(user_question, max_retries=5, delay=2):
                     completion = client.chat.completions.create(
                         model=model,
                         messages=[
-                            {"role": "system", "content": "You specialize in concisely explaining complex topics to 12yo."},
+                            {"role": "system", "content": "You specialize in leveraging the PDF content in the repository to find and discuss information from these documents."},
                             {"role": "user", "content": f"Context: {chunk}\n\nQuestion: {user_question}"}
                         ]
                     )
@@ -167,12 +167,12 @@ def modify_response_language(original_response, citations):
     response = response.replace(" them ", " us ")
     response = response.replace("Them ", "Us ")
     if citations:
-        response += "\n\nSources:\n" + "\n".join(f"- {citation}" for citation in citations)
+        response += "\n\nSources:\n" + "\n".join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/docs/{citation.split(' - ')[0]})" for citation in citations)
     return response
 
 def main():
     st.set_page_config(
-        page_title="RFP Summarization Bot",
+        page_title="Leverage Existing Proposal Content",
     )
 
     # Automatically download and process PDFs from GitHub
@@ -196,14 +196,14 @@ def main():
             st.error("No PDFs downloaded")
 
     # Main content area for displaying chat messages
-    st.title("Summarize and ask questions about RFPs")
+    st.title("Find and engage with past proposal content")
     st.write("Welcome to the chat!")
     st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
 
     # Chat input
     if "messages" not in st.session_state.keys():
         st.session_state.messages = [
-            {"role": "assistant", "content": "Query the RFP repository and ask about scope, due dates, anything you'd like..."}]
+            {"role": "assistant", "content": "Find and engage with past Carnegie proposals."}]
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
