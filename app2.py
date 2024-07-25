@@ -7,13 +7,14 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
 import streamlit as st
 from langchain_community.vectorstores import FAISS
-from langchain.chat_models import ChatOpenAI
-from langchain.chains.question_answering import load_qa_chain
-from langchain.prompts import PromptTemplate
+from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Initialize OpenAI client
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github():
@@ -57,7 +58,7 @@ def get_pdf_text(pdf_docs):
     return text
 
 # Split text into chunks
-def get_text_chunks(text, chunk_size=1000, chunk_overlap=200):
+def get_text_chunks(text, chunk_size=2000, chunk_overlap=500):
     splitter = CharacterTextSplitter(
         chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     chunks = splitter.split_text(text)
@@ -92,11 +93,8 @@ def get_conversational_chain():
 
     Answer:
     """
-    model = ChatOpenAI(api_key=OPENAI_API_KEY)
-    prompt = PromptTemplate(template=prompt_template,
-                            input_variables=["context", "question"])
-    chain = load_qa_chain(llm=model, chain_type="stuff", prompt=prompt)
-    return chain
+    model = "gpt-4o-mini"
+    return model
 
 def clear_chat_history():
     st.session_state.messages = [
@@ -114,7 +112,7 @@ def user_input(user_question, max_retries=5, delay=2):
         st.error(f"Failed to perform similarity search: {e}")
         return {"output_text": [f"Failed to perform similarity search: {e}"]}
 
-    chain = get_conversational_chain()
+    model = get_conversational_chain()
     response_text = ""
 
     for doc in docs:
@@ -124,9 +122,14 @@ def user_input(user_question, max_retries=5, delay=2):
         for chunk in context_chunks:
             for attempt in range(max_retries):
                 try:
-                    response = chain(
-                        {"input_documents": [doc], "context": chunk, "question": user_question}, return_only_outputs=True, )
-                    response_text += response['output_text'][0] + " "
+                    completion = client.chat.completions.create(
+                        model=model,
+                        messages=[
+                            {"role": "system", "content": "You specialize in concisely explaining complex topics to 12yo."},
+                            {"role": "user", "content": f"Context: {chunk}\n\nQuestion: {user_question}"}
+                        ]
+                    )
+                    response_text += completion.choices[0].message.content + " "
                     break
                 except Exception as e:
                     if 'Resource has been exhausted' in str(e):
