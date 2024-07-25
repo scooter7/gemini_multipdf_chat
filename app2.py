@@ -9,6 +9,7 @@ import streamlit as st
 from langchain_community.vectorstores import FAISS
 from openai import OpenAI
 from dotenv import load_dotenv
+from langchain.schema import Document
 from datetime import datetime
 import base64
 
