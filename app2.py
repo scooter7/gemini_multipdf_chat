@@ -112,7 +112,7 @@ def clear_chat_history():
     st.session_state.messages = [
         {"role": "assistant", "content": "Query the RFP repository and ask about scope, due dates, anything you'd like..."}]
 
-def user_input(user_question, delay=2):
+def user_input(user_question, max_retries=5, delay=2):
     vector_store = load_or_create_vector_store([])
     if not vector_store:
         st.error("Failed to load or create the vector store.")
@@ -125,19 +125,23 @@ def user_input(user_question, delay=2):
         return {"output_text": [f"Failed to perform similarity search: {e}"]}
 
     chain = get_conversational_chain()
-    try:
-        response = chain(
-            {"input_documents": docs, "question": user_question}, return_only_outputs=True, )
-        time.sleep(delay)  # Add delay between API calls
-    except Exception as e:
-        if 'Resource has been exhausted' in str(e):
-            st.error("API quota has been exhausted. Please check your quota and try again later.")
-        else:
-            st.error(f"Failed to generate response: {e}")
-        return {"output_text": [f"Failed to generate response: {e}"]}
 
-    print(response)
-    return response
+    for attempt in range(max_retries):
+        try:
+            response = chain(
+                {"input_documents": docs, "question": user_question}, return_only_outputs=True, )
+            return response
+        except Exception as e:
+            if 'Resource has been exhausted' in str(e):
+                st.warning(f"API quota has been exhausted. Retrying in {delay} seconds...")
+                time.sleep(delay)
+                delay *= 2  # Exponential backoff
+            else:
+                st.error(f"Failed to generate response: {e}")
+                return {"output_text": [f"Failed to generate response: {e}"]}
+
+    st.error("Max retries exceeded. Please try again later.")
+    return {"output_text": ["Max retries exceeded. Please try again later."]}
 
 def chunk_query(query, chunk_size=200):
     # Split the query into chunks
