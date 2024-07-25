@@ -11,6 +11,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
+import re
 
 load_dotenv()
 os.getenv("GOOGLE_API_KEY")
@@ -116,10 +117,19 @@ def user_input(user_question):
         st.error("Failed to load or create the vector store.")
         return {"output_text": ["Failed to load or create the vector store."]}
 
-    docs = vector_store.similarity_search(user_question)
+    try:
+        docs = vector_store.similarity_search(user_question)
+    except Exception as e:
+        st.error(f"Failed to perform similarity search: {e}")
+        return {"output_text": [f"Failed to perform similarity search: {e}"]}
+
     chain = get_conversational_chain()
-    response = chain(
-        {"input_documents": docs, "question": user_question}, return_only_outputs=True, )
+    try:
+        response = chain(
+            {"input_documents": docs, "question": user_question}, return_only_outputs=True, )
+    except Exception as e:
+        st.error(f"Failed to generate response: {e}")
+        return {"output_text": [f"Failed to generate response: {e}"]}
 
     print(response)
     return response
