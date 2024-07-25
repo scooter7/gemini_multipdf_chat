@@ -4,25 +4,21 @@ import requests
 from io import BytesIO
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_groq import GroqEmbeddings
 import streamlit as st
-import google.generativeai as genai
 from langchain_community.vectorstores import FAISS
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
 import re
 
 load_dotenv()
-os.getenv("GOOGLE_API_KEY")
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-
-GITHUB_REPO_URL = "https://api.github.com/repos/scooter7/gemini_multipdf_chat/contents/docs"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github():
-    api_url = GITHUB_REPO_URL
+    api_url = "https://api.github.com/repos/scooter7/gemini_multipdf_chat/contents/docs"
     headers = {"Accept": "application/vnd.github.v3+json"}
     response = requests.get(api_url, headers=headers)
     if response.status_code == 200:
@@ -73,8 +69,7 @@ def get_vector_store(chunks):
     if not chunks:
         st.error("No text chunks available for embedding")
         return None
-    embeddings = GoogleGenerativeAIEmbeddings(
-        model="models/embedding-001")  # type: ignore
+    embeddings = GroqEmbeddings(api_key=GROQ_API_KEY)
     vector_store = FAISS.from_texts(chunks, embedding=embeddings)
     vector_store.save_local("faiss_index")
     return vector_store
@@ -82,8 +77,7 @@ def get_vector_store(chunks):
 def load_or_create_vector_store(chunks):
     if os.path.exists("faiss_index"):
         try:
-            embeddings = GoogleGenerativeAIEmbeddings(
-                model="models/embedding-001")  # type: ignore
+            embeddings = GroqEmbeddings(api_key=GROQ_API_KEY)
             vector_store = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
             return vector_store
         except Exception as e:
@@ -99,10 +93,7 @@ def get_conversational_chain():
 
     Answer:
     """
-    model = ChatGoogleGenerativeAI(model="gemini-pro",
-                                   client=genai,
-                                   temperature=0.3,
-                                   )
+    model = ChatGroq(api_key=GROQ_API_KEY)
     prompt = PromptTemplate(template=prompt_template,
                             input_variables=["context", "question"])
     chain = load_qa_chain(llm=model, chain_type="stuff", prompt=prompt)
