@@ -11,7 +11,6 @@ from langchain.chat_models import ChatOpenAI
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
-import re
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -58,9 +57,9 @@ def get_pdf_text(pdf_docs):
     return text
 
 # Split text into chunks
-def get_text_chunks(text, chunk_size=500):
+def get_text_chunks(text, chunk_size=1000, chunk_overlap=200):
     splitter = CharacterTextSplitter(
-        chunk_size=chunk_size, chunk_overlap=100)
+        chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     chunks = splitter.split_text(text)
     return chunks  # list of strings
 
@@ -116,23 +115,29 @@ def user_input(user_question, max_retries=5, delay=2):
         return {"output_text": [f"Failed to perform similarity search: {e}"]}
 
     chain = get_conversational_chain()
+    response_text = ""
 
-    for attempt in range(max_retries):
-        try:
-            response = chain(
-                {"input_documents": docs, "question": user_question}, return_only_outputs=True, )
-            return response
-        except Exception as e:
-            if 'Resource has been exhausted' in str(e):
-                st.warning(f"API quota has been exhausted. Retrying in {delay} seconds...")
-                time.sleep(delay)
-                delay *= 2  # Exponential backoff
-            else:
-                st.error(f"Failed to generate response: {e}")
-                return {"output_text": [f"Failed to generate response: {e}"]}
+    for doc in docs:
+        context = doc.page_content
+        context_chunks = get_text_chunks(context)
 
-    st.error("Max retries exceeded. Please try again later.")
-    return {"output_text": ["Max retries exceeded. Please try again later."]}
+        for chunk in context_chunks:
+            for attempt in range(max_retries):
+                try:
+                    response = chain(
+                        {"input_documents": [doc], "context": chunk, "question": user_question}, return_only_outputs=True, )
+                    response_text += response['output_text'][0] + " "
+                    break
+                except Exception as e:
+                    if 'Resource has been exhausted' in str(e):
+                        st.warning(f"API quota has been exhausted. Retrying in {delay} seconds...")
+                        time.sleep(delay)
+                        delay *= 2  # Exponential backoff
+                    else:
+                        st.error(f"Failed to generate response: {e}")
+                        return {"output_text": [f"Failed to generate response: {e}"]}
+
+    return {"output_text": [response_text]}
 
 def chunk_query(query, chunk_size=200):
     # Split the query into chunks
