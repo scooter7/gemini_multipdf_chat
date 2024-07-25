@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 from io import BytesIO
 from PyPDF2 import PdfReader
@@ -61,9 +62,9 @@ def get_pdf_text(pdf_docs):
     return text
 
 # Split text into chunks
-def get_text_chunks(text):
+def get_text_chunks(text, chunk_size=500):
     splitter = CharacterTextSplitter(
-        chunk_size=1000, chunk_overlap=200)
+        chunk_size=chunk_size, chunk_overlap=100)
     chunks = splitter.split_text(text)
     return chunks  # list of strings
 
@@ -111,7 +112,7 @@ def clear_chat_history():
     st.session_state.messages = [
         {"role": "assistant", "content": "Query the RFP repository and ask about scope, due dates, anything you'd like..."}]
 
-def user_input(user_question):
+def user_input(user_question, delay=2):
     vector_store = load_or_create_vector_store([])
     if not vector_store:
         st.error("Failed to load or create the vector store.")
@@ -127,6 +128,7 @@ def user_input(user_question):
     try:
         response = chain(
             {"input_documents": docs, "question": user_question}, return_only_outputs=True, )
+        time.sleep(delay)  # Add delay between API calls
     except Exception as e:
         if 'Resource has been exhausted' in str(e):
             st.error("API quota has been exhausted. Please check your quota and try again later.")
