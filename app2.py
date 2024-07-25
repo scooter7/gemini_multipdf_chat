@@ -5,7 +5,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import streamlit as st
 import google.generativeai as genai
-from langchain.vectorstores import FAISS
+from langchain_community.vectorstores import FAISS
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
@@ -18,14 +18,16 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github():
     api_url = "https://api.github.com/repos/scooter7/gemini_multipdf_chat/contents/docs"
-    headers = {"Accept": "application/vnd.github.v3+json"}
+    headers = {
+        "Accept": "application/vnd.github.v3+json"
+    }
     response = requests.get(api_url, headers=headers)
     if response.status_code == 200:
         files = response.json()
         pdf_files = [file['download_url'] for file in files if file['name'].endswith('.pdf')]
         return pdf_files
     else:
-        st.error("Failed to fetch list of PDF files from GitHub")
+        st.error(f"Failed to fetch list of PDF files from GitHub: {response.status_code}")
         return []
 
 # Function to download PDF files from the GitHub repository
