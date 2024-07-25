@@ -1,4 +1,5 @@
 import os
+import requests
 from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
@@ -8,44 +9,48 @@ from langchain.vectorstores import FAISS
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
-import requests
+from dotenv import load_dotenv
 
-# Configure Google API key from Streamlit secrets
-genai.configure(api_key=st.secrets["google_api_key"])
-google_api_key = st.secrets["google_api_key"]
+load_dotenv()
+os.getenv("GOOGLE_API_KEY")
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-def fetch_pdfs_from_github(repo_url):
-    response = requests.get(repo_url)
-    pdf_urls = []
-    if response.status_code == 200:
-        content = response.json()
-        for file_info in content:
-            if file_info['name'].endswith('.pdf'):
-                pdf_urls.append(file_info['download_url'])
-    return pdf_urls
+# Function to download PDF files from the GitHub repository
+def download_pdfs_from_github():
+    base_url = "https://github.com/scooter7/gemini_multipdf_chat/raw/main/docs/"
+    pdf_files = ["file1.pdf", "file2.pdf"]  # List all the PDF filenames in the GitHub folder
+    pdf_docs = []
+    for file in pdf_files:
+        url = base_url + file
+        response = requests.get(url)
+        if response.status_code == 200:
+            with open(file, 'wb') as f:
+                f.write(response.content)
+            pdf_docs.append(file)
+    return pdf_docs
 
-def extract_text_from_pdf(url):
-    response = requests.get(url)
-    with open("temp.pdf", "wb") as f:
-        f.write(response.content)
-    pdf_reader = PdfReader("temp.pdf")
+# Read all pdf files and return text
+def get_pdf_text(pdf_docs):
     text = ""
-    for page in pdf_reader.pages:
-        text += page.extract_text()
-    os.remove("temp.pdf")
+    for pdf in pdf_docs:
+        pdf_reader = PdfReader(pdf)
+        for page in pdf_reader.pages:
+            text += page.extract_text()
     return text
 
+# Split text into chunks
 def get_text_chunks(text):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=10000, chunk_overlap=1000)
     chunks = splitter.split_text(text)
-    return chunks
+    return chunks  # list of strings
 
-@st.cache_resource
+# Get embeddings for each chunk
 def get_vector_store(chunks):
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=google_api_key)
+    embeddings = GoogleGenerativeAIEmbeddings(
+        model="models/embedding-001")  # type: ignore
     vector_store = FAISS.from_texts(chunks, embedding=embeddings)
     vector_store.save_local("faiss_index")
-    return vector_store
 
 def get_conversational_chain():
     prompt_template = """
@@ -53,47 +58,62 @@ def get_conversational_chain():
     provided context just say, "answer is not available in the context", don't provide the wrong answer\n\n
     Context:\n {context}?\n
     Question: \n{question}\n
+
     Answer:
     """
-    model = ChatGoogleGenerativeAI(model="gemini-pro", client=genai, temperature=0.3)
-    prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
+    model = ChatGoogleGenerativeAI(model="gemini-pro",
+                                   client=genai,
+                                   temperature=0.3,
+                                   )
+    prompt = PromptTemplate(template=prompt_template,
+                            input_variables=["context", "question"])
     chain = load_qa_chain(llm=model, chain_type="stuff", prompt=prompt)
     return chain
 
 def clear_chat_history():
     st.session_state.messages = [
-        {"role": "assistant", "content": "upload an RFP and ask about scope, due dates, anything you'd like..."}
-    ]
+        {"role": "assistant", "content": "Query the RFP repository and ask about scope, due dates, anything you'd like..."}]
 
 def user_input(user_question):
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001", google_api_key=google_api_key)
+    embeddings = GoogleGenerativeAIEmbeddings(
+        model="models/embedding-001")  # type: ignore
+
+    # Adjusted line to include allow_dangerous_deserialization=True
     new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
     docs = new_db.similarity_search(user_question)
+
     chain = get_conversational_chain()
-    response = chain({"input_documents": docs, "question": user_question}, return_only_outputs=True)
+
+    response = chain(
+        {"input_documents": docs, "question": user_question}, return_only_outputs=True, )
+
+    print(response)
     return response
 
 def main():
-    st.set_page_config(page_title="RFP Summarization Bot")
+    st.set_page_config(
+        page_title="RFP Summarization Bot",
+    )
 
-    repo_url = 'https://api.github.com/repos/scooter7/gemini_multipdf_chat/contents/docs'
-    pdf_urls = fetch_pdfs_from_github(repo_url)
-    pdf_texts = {url: extract_text_from_pdf(url) for url in pdf_urls}
+    # Automatically download and process PDFs from GitHub
+    with st.spinner("Downloading and processing PDFs..."):
+        pdf_docs = download_pdfs_from_github()
+        raw_text = get_pdf_text(pdf_docs)
+        text_chunks = get_text_chunks(raw_text)
+        get_vector_store(text_chunks)
+        st.success("PDF processing complete")
 
-    st.title("PDF Query App")
+    # Main content area for displaying chat messages
+    st.title("Summarize and ask questions about RFPs")
+    st.write("Welcome to the chat!")
+    st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
 
-    query = st.text_input("Enter your query")
-    if query:
-        st.write(f"Results for query: {query}")
-        for url, text in pdf_texts.items():
-            if query.lower() in text.lower():
-                st.write(f"**PDF URL:** {url}")
-                st.write(text[:500])
+    # Chat input
+    # Placeholder for chat messages
 
     if "messages" not in st.session_state.keys():
         st.session_state.messages = [
-            {"role": "assistant", "content": "upload an RFP and ask about scope, due dates, anything you'd like..."}
-        ]
+            {"role": "assistant", "content": "Query the RFP repository and ask about scope, due dates, anything you'd like..."}]
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
@@ -104,6 +124,7 @@ def main():
         with st.chat_message("user"):
             st.write(prompt)
 
+    # Display chat messages and bot response
     if st.session_state.messages[-1]["role"] != "assistant":
         with st.chat_message("assistant"):
             with st.spinner("Thinking..."):
