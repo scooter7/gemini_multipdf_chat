@@ -77,6 +77,17 @@ def get_vector_store(chunks):
     vector_store.save_local("faiss_index")
     return vector_store
 
+def load_or_create_vector_store(chunks):
+    if os.path.exists("faiss_index"):
+        try:
+            embeddings = GoogleGenerativeAIEmbeddings(
+                model="models/embedding-001")  # type: ignore
+            vector_store = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
+            return vector_store
+        except Exception as e:
+            st.error(f"Failed to load FAISS index: {e}")
+    return get_vector_store(chunks)
+
 def get_conversational_chain():
     prompt_template = """
     Answer the question as detailed as possible from the provided context, make sure to provide all the details, if the answer is not in
@@ -100,14 +111,13 @@ def clear_chat_history():
         {"role": "assistant", "content": "Query the RFP repository and ask about scope, due dates, anything you'd like..."}]
 
 def user_input(user_question):
-    embeddings = GoogleGenerativeAIEmbeddings(
-        model="models/embedding-001")  # type: ignore
+    vector_store = load_or_create_vector_store([])
+    if not vector_store:
+        st.error("Failed to load or create the vector store.")
+        return {"output_text": ["Failed to load or create the vector store."]}
 
-    new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
-    docs = new_db.similarity_search(user_question)
-
+    docs = vector_store.similarity_search(user_question)
     chain = get_conversational_chain()
-
     response = chain(
         {"input_documents": docs, "question": user_question}, return_only_outputs=True, )
 
@@ -127,7 +137,7 @@ def main():
             if raw_text:
                 text_chunks = get_text_chunks(raw_text)
                 if text_chunks:
-                    vector_store = get_vector_store(text_chunks)
+                    vector_store = load_or_create_vector_store(text_chunks)
                     if vector_store:
                         st.success("PDF processing complete")
                     else:
