@@ -15,18 +15,32 @@ load_dotenv()
 os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
+# Function to get list of PDFs from GitHub repository
+def get_pdfs_from_github():
+    api_url = "https://api.github.com/repos/scooter7/gemini_multipdf_chat/contents/docs"
+    headers = {"Accept": "application/vnd.github.v3+json"}
+    response = requests.get(api_url, headers=headers)
+    if response.status_code == 200:
+        files = response.json()
+        pdf_files = [file['download_url'] for file in files if file['name'].endswith('.pdf')]
+        return pdf_files
+    else:
+        st.error("Failed to fetch list of PDF files from GitHub")
+        return []
+
 # Function to download PDF files from the GitHub repository
 def download_pdfs_from_github():
-    base_url = "https://github.com/scooter7/gemini_multipdf_chat/raw/main/docs/"
-    pdf_files = ["file1.pdf", "file2.pdf"]  # List all the PDF filenames in the GitHub folder
+    pdf_urls = get_pdfs_from_github()
     pdf_docs = []
-    for file in pdf_files:
-        url = base_url + file
+    for url in pdf_urls:
         response = requests.get(url)
         if response.status_code == 200:
-            with open(file, 'wb') as f:
+            file_name = url.split('/')[-1]
+            with open(file_name, 'wb') as f:
                 f.write(response.content)
-            pdf_docs.append(file)
+            pdf_docs.append(file_name)
+        else:
+            st.error(f"Failed to download {url}")
     return pdf_docs
 
 # Read all pdf files and return text
@@ -35,7 +49,11 @@ def get_pdf_text(pdf_docs):
     for pdf in pdf_docs:
         pdf_reader = PdfReader(pdf)
         for page in pdf_reader.pages:
-            text += page.extract_text()
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text
+            else:
+                st.warning(f"Failed to extract text from page in {pdf}")
     return text
 
 # Split text into chunks
@@ -47,10 +65,14 @@ def get_text_chunks(text):
 
 # Get embeddings for each chunk
 def get_vector_store(chunks):
+    if not chunks:
+        st.error("No text chunks available for embedding")
+        return None
     embeddings = GoogleGenerativeAIEmbeddings(
         model="models/embedding-001")  # type: ignore
     vector_store = FAISS.from_texts(chunks, embedding=embeddings)
     vector_store.save_local("faiss_index")
+    return vector_store
 
 def get_conversational_chain():
     prompt_template = """
@@ -78,7 +100,6 @@ def user_input(user_question):
     embeddings = GoogleGenerativeAIEmbeddings(
         model="models/embedding-001")  # type: ignore
 
-    # Adjusted line to include allow_dangerous_deserialization=True
     new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
     docs = new_db.similarity_search(user_question)
 
@@ -98,10 +119,22 @@ def main():
     # Automatically download and process PDFs from GitHub
     with st.spinner("Downloading and processing PDFs..."):
         pdf_docs = download_pdfs_from_github()
-        raw_text = get_pdf_text(pdf_docs)
-        text_chunks = get_text_chunks(raw_text)
-        get_vector_store(text_chunks)
-        st.success("PDF processing complete")
+        if pdf_docs:
+            raw_text = get_pdf_text(pdf_docs)
+            if raw_text:
+                text_chunks = get_text_chunks(raw_text)
+                if text_chunks:
+                    vector_store = get_vector_store(text_chunks)
+                    if vector_store:
+                        st.success("PDF processing complete")
+                    else:
+                        st.error("Failed to create vector store")
+                else:
+                    st.error("No text chunks created")
+            else:
+                st.error("No text extracted from PDFs")
+        else:
+            st.error("No PDFs downloaded")
 
     # Main content area for displaying chat messages
     st.title("Summarize and ask questions about RFPs")
@@ -109,8 +142,6 @@ def main():
     st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
 
     # Chat input
-    # Placeholder for chat messages
-
     if "messages" not in st.session_state.keys():
         st.session_state.messages = [
             {"role": "assistant", "content": "Query the RFP repository and ask about scope, due dates, anything you'd like..."}]
