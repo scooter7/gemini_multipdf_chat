@@ -4,17 +4,17 @@ import requests
 from io import BytesIO
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
-from langchain_groq import GroqEmbeddings
+from langchain.embeddings import OpenAIEmbeddings
 import streamlit as st
 from langchain_community.vectorstores import FAISS
-from langchain_groq import ChatGroq
+from langchain.chat_models import ChatOpenAI
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
 import re
 
 load_dotenv()
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github():
@@ -69,7 +69,7 @@ def get_vector_store(chunks):
     if not chunks:
         st.error("No text chunks available for embedding")
         return None
-    embeddings = GroqEmbeddings(api_key=GROQ_API_KEY)
+    embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
     vector_store = FAISS.from_texts(chunks, embedding=embeddings)
     vector_store.save_local("faiss_index")
     return vector_store
@@ -77,7 +77,7 @@ def get_vector_store(chunks):
 def load_or_create_vector_store(chunks):
     if os.path.exists("faiss_index"):
         try:
-            embeddings = GroqEmbeddings(api_key=GROQ_API_KEY)
+            embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
             vector_store = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
             return vector_store
         except Exception as e:
@@ -93,7 +93,7 @@ def get_conversational_chain():
 
     Answer:
     """
-    model = ChatGroq(api_key=GROQ_API_KEY)
+    model = ChatOpenAI(api_key=OPENAI_API_KEY)
     prompt = PromptTemplate(template=prompt_template,
                             input_variables=["context", "question"])
     chain = load_qa_chain(llm=model, chain_type="stuff", prompt=prompt)
