@@ -128,7 +128,10 @@ def user_input(user_question):
         response = chain(
             {"input_documents": docs, "question": user_question}, return_only_outputs=True, )
     except Exception as e:
-        st.error(f"Failed to generate response: {e}")
+        if 'Resource has been exhausted' in str(e):
+            st.error("API quota has been exhausted. Please check your quota and try again later.")
+        else:
+            st.error(f"Failed to generate response: {e}")
         return {"output_text": [f"Failed to generate response: {e}"]}
 
     print(response)
