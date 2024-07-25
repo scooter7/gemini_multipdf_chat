@@ -1,7 +1,8 @@
 import os
 import requests
+from io import BytesIO
 from PyPDF2 import PdfReader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.text_splitter import CharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import streamlit as st
 import google.generativeai as genai
@@ -15,12 +16,12 @@ load_dotenv()
 os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
+GITHUB_REPO_URL = "https://api.github.com/repos/scooter7/gemini_multipdf_chat/contents/docs"
+
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github():
-    api_url = "https://api.github.com/repos/scooter7/gemini_multipdf_chat/contents/docs"
-    headers = {
-        "Accept": "application/vnd.github.v3+json"
-    }
+    api_url = GITHUB_REPO_URL
+    headers = {"Accept": "application/vnd.github.v3+json"}
     response = requests.get(api_url, headers=headers)
     if response.status_code == 200:
         files = response.json()
@@ -60,8 +61,8 @@ def get_pdf_text(pdf_docs):
 
 # Split text into chunks
 def get_text_chunks(text):
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=10000, chunk_overlap=1000)
+    splitter = CharacterTextSplitter(
+        chunk_size=1000, chunk_overlap=200)
     chunks = splitter.split_text(text)
     return chunks  # list of strings
 
