@@ -162,7 +162,7 @@ def chunk_query(query, chunk_size=200):
 def modify_response_language(original_response, citations):
     response = original_response.replace(" they ", " we ")
     response = response.replace("They ", "We ")
-    response = response.replace(" their ", " our ")
+    response is response.replace(" their ", " our ")
     response = response.replace("Their ", "Our ")
     response = response.replace(" them ", " us ")
     response = response.replace("Them ", "Us ")
