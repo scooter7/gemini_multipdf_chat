@@ -109,7 +109,7 @@ def get_conversational_chain():
 
 def clear_chat_history():
     st.session_state.messages = [
-        {"role": "assistant", "content": "Query the RFP repository and ask about scope, due dates, anything you'd like..."}]
+        {"role": "assistant", "content": "Find and engage with past Carnegie proposals."}]
 
 def user_input(user_question, max_retries=5, delay=2):
     vector_store = load_or_create_vector_store([], [])
@@ -172,7 +172,7 @@ def modify_response_language(original_response, citations):
 
 def main():
     st.set_page_config(
-        page_title="RFP Summarization Bot",
+        page_title="Leverage Existing Proposal Content",
     )
 
     # Automatically download and process PDFs from GitHub
@@ -196,14 +196,14 @@ def main():
             st.error("No PDFs downloaded")
 
     # Main content area for displaying chat messages
-    st.title("Summarize and ask questions about RFPs")
+    st.title("Find and engage with past proposal content")
     st.write("Welcome to the chat!")
     st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
 
     # Chat input
     if "messages" not in st.session_state.keys():
         st.session_state.messages = [
-            {"role": "assistant", "content": "Query the RFP repository and ask about scope, due dates, anything you'd like..."}]
+            {"role": "assistant", "content": "Find and engage with past Carnegie proposals."}]
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
