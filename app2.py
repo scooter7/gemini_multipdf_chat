@@ -137,6 +137,10 @@ def user_input(user_question):
     print(response)
     return response
 
+def chunk_query(query, chunk_size=200):
+    # Split the query into chunks
+    return [query[i:i+chunk_size] for i in range(0, len(query), chunk_size)]
+
 def main():
     st.set_page_config(
         page_title="RFP Summarization Bot",
@@ -181,20 +185,18 @@ def main():
         with st.chat_message("user"):
             st.write(prompt)
 
-    # Display chat messages and bot response
-    if st.session_state.messages[-1]["role"] != "assistant":
+        # Split the prompt into smaller chunks and process each one
+        query_chunks = chunk_query(prompt)
+        full_response = ''
+
+        for chunk in query_chunks:
+            response = user_input(chunk)
+            for item in response['output_text']:
+                full_response += item
+
         with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                response = user_input(prompt)
-                placeholder = st.empty()
-                full_response = ''
-                for item in response['output_text']:
-                    full_response += item
-                    placeholder.markdown(full_response)
-                placeholder.markdown(full_response)
-        if response is not None:
-            message = {"role": "assistant", "content": full_response}
-            st.session_state.messages.append(message)
+            st.write(full_response)
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
 
 if __name__ == "__main__":
     main()
