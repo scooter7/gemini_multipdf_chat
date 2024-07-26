@@ -321,7 +321,7 @@ def download_pdfs_from_github_3():
     pdf_docs = []
     for url in pdf_urls:
         response = requests.get(url)
-        if response.status_code == 200):
+        if response.status_code == 200:
             file_name = url.split('/')[-1]
             with open(file_name, 'wb') as f:
                 f.write(response.content)
@@ -329,7 +329,6 @@ def download_pdfs_from_github_3():
         else:
             st.error(f"Failed to download {url}")
     return pdf_docs
-
 
 def get_conversational_chain_3():
     prompt_template = """
