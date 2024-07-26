@@ -24,7 +24,6 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=GOOGLE_API_KEY)
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-
 # Shared Functions
 def get_pdf_text(pdf_docs):
     text = []
@@ -40,7 +39,6 @@ def get_pdf_text(pdf_docs):
                 st.warning(f"Failed to extract text from page in {pdf}")
     return text, source_metadata
 
-
 def get_text_chunks(text, metadata, chunk_size=2000, chunk_overlap=500):
     splitter = CharacterTextSplitter(
         chunk_size=chunk_size, chunk_overlap=chunk_overlap)
@@ -52,7 +50,6 @@ def get_text_chunks(text, metadata, chunk_size=2000, chunk_overlap=500):
         chunk_metadata.extend([metadata[i]] * len(page_chunks))  # Assign correct metadata to each chunk
     return chunks, chunk_metadata
 
-
 def get_vector_store(chunks, metadata):
     if not chunks:
         st.error("No text chunks available for embedding")
@@ -63,7 +60,6 @@ def get_vector_store(chunks, metadata):
     vector_store.save_local("faiss_index")
     return vector_store
 
-
 def load_or_create_vector_store(chunks, metadata):
     if os.path.exists("faiss_index"):
         try:
@@ -73,7 +69,6 @@ def load_or_create_vector_store(chunks, metadata):
         except Exception as e:
             st.error(f"Failed to load FAISS index: {e}")
     return get_vector_store(chunks, metadata)
-
 
 # App 1 Functions
 def get_pdfs_from_github_1():
@@ -87,7 +82,6 @@ def get_pdfs_from_github_1():
     else:
         st.error(f"Failed to fetch list of PDF files from GitHub: {response.status_code}")
         return []
-
 
 def download_pdfs_from_github_1():
     pdf_urls = get_pdfs_from_github_1()
@@ -103,11 +97,9 @@ def download_pdfs_from_github_1():
             st.error(f"Failed to download {url}")
     return pdf_docs
 
-
 def clear_chat_history_1():
     st.session_state.messages = [
         {"role": "assistant", "content": "Find and engage with past proposal questions and answers."}]
-
 
 def user_input_1(user_question, max_retries=5, delay=2):
     vector_store = load_or_create_vector_store([], [])
@@ -130,15 +122,8 @@ def user_input_1(user_question, max_retries=5, delay=2):
 
     return {"output_text": [response_text], "citations": citations}
 
-
 def chunk_query_1(query, chunk_size=200):
     return [query[i:i + chunk_size] for i in range(0, len(query), chunk_size)]
-
-
-    response = original_response
-    if citations:
-        response += "\n\nSources:\n" + "\n".join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/qna/{citation.split(' - ')[0]})" for citation in citations)
-    return response
 
 def app1():
     with st.spinner("Downloading and processing PDFs..."):
@@ -172,7 +157,7 @@ def app1():
         with st.chat_message(message["role"]):
             st.write(message["content"])
 
-    if prompt := st.chat_input():
+    if prompt := st.chat_input(key="chat_input_1"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.write(prompt)
@@ -193,7 +178,6 @@ def app1():
             st.write(modified_response)
             st.session_state.messages.append({"role": "assistant", "content": modified_response})
 
-
 # App 2 Functions
 def get_pdf_text_2(pdf_docs):
     text = ""
@@ -203,20 +187,17 @@ def get_pdf_text_2(pdf_docs):
             text += page.extract_text()
     return text
 
-
 def get_text_chunks_2(text):
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=10000, chunk_overlap=1000)
     chunks = splitter.split_text(text)
     return chunks
 
-
 def get_vector_store_2(chunks):
     embeddings = GoogleGenerativeAIEmbeddings(
         model="models/embedding-001")  # type: ignore
     vector_store = LangchainFAISS.from_texts(chunks, embedding=embeddings)
     vector_store.save_local("faiss_index")
-
 
 def get_conversational_chain_2():
     prompt_template = """
@@ -227,7 +208,6 @@ def get_conversational_chain_2():
 
     Answer:
     """
-
     model = ChatGoogleGenerativeAI(model="gemini-pro",
                                    client=genai,
                                    temperature=0.3,
@@ -237,11 +217,9 @@ def get_conversational_chain_2():
     chain = load_qa_chain(llm=model, chain_type="stuff", prompt=prompt)
     return chain
 
-
 def clear_chat_history_2():
     st.session_state.messages = [
         {"role": "assistant", "content": "upload an RFP and ask about scope, due dates, anything you'd like..."}]
-
 
 def user_input_2(user_question):
     embeddings = GoogleGenerativeAIEmbeddings(
@@ -256,7 +234,6 @@ def user_input_2(user_question):
         {"input_documents": docs, "question": user_question}, return_only_outputs=True, )
 
     return response
-
 
 def app2():
     with st.sidebar:
@@ -282,7 +259,7 @@ def app2():
         with st.chat_message(message["role"]):
             st.write(message["content"])
 
-    if prompt := st.chat_input():
+    if prompt := st.chat_input(key="chat_input_2"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.write(prompt)
@@ -301,7 +278,6 @@ def app2():
             message = {"role": "assistant", "content": full_response}
             st.session_state.messages.append(message)
 
-
 # App 3 Functions
 def get_pdfs_from_github_3():
     api_url = "https://api.github.com/repos/scooter7/gemini_multipdf_chat/contents/docs"
@@ -314,7 +290,6 @@ def get_pdfs_from_github_3():
     else:
         st.error(f"Failed to fetch list of PDF files from GitHub: {response.status_code}")
         return []
-
 
 def download_pdfs_from_github_3():
     pdf_urls = get_pdfs_from_github_3()
@@ -342,11 +317,9 @@ def get_conversational_chain_3():
     model = "gpt-4o-mini"
     return model
 
-
 def clear_chat_history_3():
     st.session_state.messages = [
         {"role": "assistant", "content": "Find and engage with past Carnegie proposals."}]
-
 
 def user_input_3(user_question, max_retries=5, delay=2):
     vector_store = load_or_create_vector_store([], [])
@@ -392,10 +365,8 @@ def user_input_3(user_question, max_retries=5, delay=2):
 
     return {"output_text": [response_text], "citations": citations}
 
-
 def chunk_query_3(query, chunk_size=200):
     return [query[i:i + chunk_size] for i in range(0, len(query), chunk_size)]
-
 
 def modify_response_language_3(original_response, citations):
     response = original_response.replace(" they ", " we ")
@@ -407,7 +378,6 @@ def modify_response_language_3(original_response, citations):
     if citations:
         response += "\n\nSources:\n" + "\n".join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/docs/{citation.split(' - ')[0]})" for citation in citations)
     return response
-
 
 def app3():
     with st.spinner("Downloading and processing PDFs..."):
@@ -441,7 +411,7 @@ def app3():
         with st.chat_message(message["role"]):
             st.write(message["content"])
 
-    if prompt := st.chat_input():
+    if prompt := st.chat_input(key="chat_input_3"):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.write(prompt)
@@ -462,7 +432,6 @@ def app3():
             st.write(modified_response)
             st.session_state.messages.append({"role": "assistant", "content": modified_response})
 
-
 # Main App
 def main():
     st.set_page_config(page_title="Combined Application", layout="wide")
@@ -477,7 +446,6 @@ def main():
 
     with tab3:
         app3()
-
 
 if __name__ == "__main__":
     main()
