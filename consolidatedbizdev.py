@@ -138,7 +138,7 @@ def chunk_query_1(query, chunk_size=200):
 def modify_response_language_1(original_response, citations):
     response = original_response
     if citations:
-        response += "\n\nSources:\n" + "\n".join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/qna/{citation.split(' - ')[0]})" for citation in citations)
+        response += "\n\nSources:\n" + "\n.join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/qna/{citation.split(' - ')[0]})" for citation in citations)
     return response
 
 
@@ -164,7 +164,7 @@ def app1():
 
     st.title("Past Proposal Q&A")
     st.write("Welcome to the chat!")
-    st.sidebar.button('Clear Chat History', on_click=clear_chat_history_1)
+    st.sidebar.button('Clear Chat History 1', on_click=clear_chat_history_1, key='clear_chat_history_1')
 
     if "messages" not in st.session_state.keys():
         st.session_state.messages = [
@@ -265,7 +265,7 @@ def app2():
         st.title("Menu:")
         pdf_docs = st.file_uploader(
             "Upload your PDF Files and Click on the Submit & Process Button", accept_multiple_files=True)
-        if st.button("Submit & Process"):
+        if st.button("Submit & Process", key='submit_process_2'):
             with st.spinner("Processing..."):
                 raw_text = get_pdf_text_2(pdf_docs)
                 text_chunks = get_text_chunks_2(raw_text)
@@ -274,7 +274,7 @@ def app2():
 
     st.title("Summarize and ask questions about RFPs")
     st.write("Welcome to the chat!")
-    st.sidebar.button('Clear Chat History', on_click=clear_chat_history_2)
+    st.sidebar.button('Clear Chat History 2', on_click=clear_chat_history_2, key='clear_chat_history_2')
 
     if "messages" not in st.session_state.keys():
         st.session_state.messages = [
@@ -323,7 +323,7 @@ def download_pdfs_from_github_3():
     pdf_docs = []
     for url in pdf_urls:
         response = requests.get(url)
-        if response.status_code == 200:
+        if response.status_code == 200):
             file_name = url.split('/')[-1]
             with open(file_name, 'wb') as f:
                 f.write(response.content)
@@ -434,7 +434,7 @@ def app3():
 
     st.title("Find and engage with past proposal content")
     st.write("Welcome to the chat!")
-    st.sidebar.button('Clear Chat History', on_click=clear_chat_history_3)
+    st.sidebar.button('Clear Chat History 3', on_click=clear_chat_history_3, key='clear_chat_history_3')
 
     if "messages" not in st.session_state.keys():
         st.session_state.messages = [
