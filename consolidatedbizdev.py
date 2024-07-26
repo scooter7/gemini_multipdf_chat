@@ -441,27 +441,27 @@ def main():
     with tab1:
         with st.sidebar:
             st.title("Menu:")
-            st.sidebar.button('Clear Chat History 1', on_click=clear_chat_history_1, key='clear_chat_history_1')
+            st.button('Clear Chat History 1', on_click=clear_chat_history_1, key='clear_chat_history_1_tab1')
         app1()
 
     with tab2:
         with st.sidebar:
             st.title("Menu:")
             pdf_docs = st.file_uploader(
-                "Upload your PDF Files and Click on the Submit & Process Button", accept_multiple_files=True)
-            if st.button("Submit & Process", key='submit_process_2'):
+                "Upload your PDF Files and Click on the Submit & Process Button", accept_multiple_files=True, key='pdf_uploader_tab2')
+            if st.button("Submit & Process", key='submit_process_2_tab2'):
                 with st.spinner("Processing..."):
                     raw_text = get_pdf_text_2(pdf_docs)
                     text_chunks = get_text_chunks_2(raw_text)
                     get_vector_store_2(text_chunks)
                     st.success("Done")
-            st.sidebar.button('Clear Chat History 2', on_click=clear_chat_history_2, key='clear_chat_history_2')
+            st.button('Clear Chat History 2', on_click=clear_chat_history_2, key='clear_chat_history_2_tab2')
         app2()
 
     with tab3:
         with st.sidebar:
             st.title("Menu:")
-            st.sidebar.button('Clear Chat History 3', on_click=clear_chat_history_3, key='clear_chat_history_3')
+            st.button('Clear Chat History 3', on_click=clear_chat_history_3, key='clear_chat_history_3_tab3')
         app3()
 
 if __name__ == "__main__":
