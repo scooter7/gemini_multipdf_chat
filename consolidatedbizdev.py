@@ -1,4 +1,5 @@
 import streamlit as st
+from streamlit_option_menu import option_menu
 
 st.set_page_config(
     page_title="Carnegie Business Development Suite",
@@ -14,33 +15,31 @@ def clear_chat_history():
     if "messages" in st.session_state:
         del st.session_state.messages
 
-# Function to handle app navigation
-def navigate_to_page(page):
+# Function to handle page refresh
+def refresh_page():
     clear_chat_history()
-    st.session_state.page = page
+    st.experimental_rerun()
 
-# Set up navigation
-if "page" not in st.session_state:
-    st.session_state.page = "Welcome"
-
-# Sidebar for navigation
-with st.sidebar:
-    if st.button("Go to App 1"):
-        navigate_to_page("App1")
-    if st.button("Go to App 2"):
-        navigate_to_page("App2")
-    if st.button("Go to App 3"):
-        navigate_to_page("App3")
+# Set up navigation with option menu
+selected = option_menu(
+    menu_title=None,
+    options=["Welcome", "App1", "App2", "App3"],
+    icons=["house", "file-earmark", "file-earmark", "file-earmark"],
+    menu_icon="cast",
+    default_index=0,
+    orientation="horizontal",
+    on_change=refresh_page
+)
 
 # Main content area
-if st.session_state.page == "Welcome":
+if selected == "Welcome":
     st.write("Welcome to the Carnegie Business Development Suite! Please select an app from the sidebar.")
-elif st.session_state.page == "App1":
+elif selected == "App1":
     import app1  # Assuming app1.py exists and defines a function main()
     app1.main()
-elif st.session_state.page == "App2":
+elif selected == "App2":
     import app2  # Assuming app2.py exists and defines a function main()
     app2.main()
-elif st.session_state.page == "App3":
+elif selected == "App3":
     import app3  # Assuming app3.py exists and defines a function main()
     app3.main()
