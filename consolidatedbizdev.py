@@ -15,8 +15,8 @@ def clear_chat_history():
     if "messages" in st.session_state:
         del st.session_state.messages
 
-# Function to handle page refresh
-def refresh_page():
+# Ensure page refresh when changing tabs
+def on_tab_change():
     clear_chat_history()
     st.experimental_rerun()
 
@@ -28,7 +28,8 @@ selected = option_menu(
     menu_icon="cast",
     default_index=0,
     orientation="horizontal",
-    on_change=refresh_page
+    key="tab_selection",
+    on_change=on_tab_change
 )
 
 # Main content area
