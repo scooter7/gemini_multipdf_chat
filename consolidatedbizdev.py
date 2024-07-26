@@ -436,14 +436,18 @@ def app3():
 def main():
     st.set_page_config(page_title="Combined Application", layout="wide")
     st.title("Combined Application")
+    
+    # Tabs
     tab1, tab2, tab3 = st.tabs(["Tab 1: Past Proposal Q&A", "Tab 2: RFP Summarization Bot", "Tab 3: Leverage Existing Proposal Content"])
 
+    # Tab 1: Past Proposal Q&A
     with tab1:
         with st.sidebar:
             st.title("Menu:")
             st.button('Clear Chat History 1', on_click=clear_chat_history_1, key='clear_chat_history_1_tab1')
         app1()
 
+    # Tab 2: RFP Summarization Bot
     with tab2:
         with st.sidebar:
             st.title("Menu:")
@@ -458,6 +462,7 @@ def main():
             st.button('Clear Chat History 2', on_click=clear_chat_history_2, key='clear_chat_history_2_tab2')
         app2()
 
+    # Tab 3: Leverage Existing Proposal Content
     with tab3:
         with st.sidebar:
             st.title("Menu:")
