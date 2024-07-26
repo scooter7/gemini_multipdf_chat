@@ -135,12 +135,10 @@ def chunk_query_1(query, chunk_size=200):
     return [query[i:i + chunk_size] for i in range(0, len(query), chunk_size)]
 
 
-def modify_response_language_1(original_response, citations):
     response = original_response
     if citations:
-        response += "\n\nSources:\n" + "\n.join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/qna/{citation.split(' - ')[0]})" for citation in citations)
+        response += "\n\nSources:\n" + "\n".join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/qna/{citation.split(' - ')[0]})" for citation in citations)
     return response
-
 
 def app1():
     with st.spinner("Downloading and processing PDFs..."):
