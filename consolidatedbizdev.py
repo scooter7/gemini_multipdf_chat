@@ -1,13 +1,14 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
 
+st.set_page_config(page_title="Multi-App Streamlit Application")
+
 # Define each app as a function
 def app1():
     import os
     from PyPDF2 import PdfReader
     from langchain.text_splitter import RecursiveCharacterTextSplitter
     from langchain_google_genai import GoogleGenerativeAIEmbeddings
-    import streamlit as st
     import google.generativeai as genai
     from langchain.vectorstores import FAISS
     from langchain_google_genai import ChatGoogleGenerativeAI
@@ -16,10 +17,8 @@ def app1():
     from dotenv import load_dotenv
 
     load_dotenv()
-    os.getenv("GOOGLE_API_KEY")
     genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-    # read all pdf files and return text
     def get_pdf_text(pdf_docs):
         text = ""
         for pdf in pdf_docs:
@@ -28,15 +27,13 @@ def app1():
                 text += page.extract_text()
         return text
 
-    # split text into chunks
     def get_text_chunks(text):
         splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
         chunks = splitter.split_text(text)
-        return chunks  # list of strings
+        return chunks
 
-    # get embeddings for each chunk
     def get_vector_store(chunks):
-        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")  # type: ignore
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
         vector_store = FAISS.from_texts(chunks, embedding=embeddings)
         vector_store.save_local("faiss_index")
 
@@ -49,78 +46,59 @@ def app1():
 
         Answer:
         """
-
         model = ChatGoogleGenerativeAI(model="gemini-pro", client=genai, temperature=0.3)
         prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
         chain = load_qa_chain(llm=model, chain_type="stuff", prompt=prompt)
         return chain
 
     def clear_chat_history():
-        st.session_state.messages = [{"role": "assistant", "content": "upload an RFP and ask about scope, due dates, anything you'd like..."}]
+        st.session_state.messages = [{"role": "assistant", "content": "Upload an RFP and ask about scope, due dates, anything you'd like..."}]
 
     def user_input(user_question):
-        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")  # type: ignore
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
         new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
         docs = new_db.similarity_search(user_question)
         chain = get_conversational_chain()
         response = chain({"input_documents": docs, "question": user_question}, return_only_outputs=True)
-        print(response)
         return response
 
-    def main_app1():
-        st.set_page_config(page_title="RFP Summarization Bot")
+    st.title("RFP Summarization Bot")
+    with st.sidebar:
+        st.title("Menu:")
+        pdf_docs = st.file_uploader("Upload your PDF Files and Click on the Submit & Process Button", accept_multiple_files=True)
+        if st.button("Submit & Process"):
+            with st.spinner("Processing..."):
+                raw_text = get_pdf_text(pdf_docs)
+                text_chunks = get_text_chunks(raw_text)
+                get_vector_store(text_chunks)
+                st.success("Done")
 
-        # Sidebar for uploading PDF files
-        with st.sidebar:
-            st.title("Menu:")
-            pdf_docs = st.file_uploader("Upload your PDF Files and Click on the Submit & Process Button", accept_multiple_files=True)
-            if st.button("Submit & Process"):
-                with st.spinner("Processing..."):
-                    raw_text = get_pdf_text(pdf_docs)
-                    text_chunks = get_text_chunks(raw_text)
-                    get_vector_store(text_chunks)
-                    st.success("Done")
+    st.write("Welcome to the chat!")
+    st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
 
-        # Main content area for displaying chat messages
-        st.title("Summarize and ask questions about RFPs")
-        st.write("Welcome to the chat!")
-        st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
+    if "messages" not in st.session_state.keys():
+        st.session_state.messages = [{"role": "assistant", "content": "Upload an RFP and ask about scope, due dates, anything you'd like..."}]
 
-        # Chat input
-        if "messages" not in st.session_state.keys():
-            st.session_state.messages = [{"role": "assistant", "content": "upload an RFP and ask about scope, due dates, anything you'd like..."}]
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
 
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.write(message["content"])
+    if prompt := st.chat_input():
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.write(prompt)
 
-        if prompt := st.chat_input():
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.write(prompt)
-
-        # Display chat messages and bot response
-        if st.session_state.messages[-1]["role"] != "assistant":
-            with st.chat_message("assistant"):
-                with st.spinner("Thinking..."):
-                    response = user_input(prompt)
-                    placeholder = st.empty()
-                    full_response = ''
-                    for item in response['output_text']:
-                        full_response += item
-                        placeholder.markdown(full_response)
-                    placeholder.markdown(full_response)
-            if response is not None:
-                message = {"role": "assistant", "content": full_response}
-                st.session_state.messages.append(message)
-
-    main_app1()
+    if st.session_state.messages[-1]["role"] != "assistant":
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                response = user_input(prompt)
+                full_response = ''.join(response['output_text'])
+                st.write(full_response)
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
 
 def app2():
     import os
-    import time
     import requests
-    from io import BytesIO
     from PyPDF2 import PdfReader
     from langchain.text_splitter import CharacterTextSplitter
     from langchain.embeddings import OpenAIEmbeddings
@@ -179,7 +157,7 @@ def app2():
         for i, page_text in enumerate(text):
             page_chunks = splitter.split_text(page_text)
             chunks.extend(page_chunks)
-            chunk_metadata.extend([metadata[i]] * len(page_chunks))  # Assign correct metadata to each chunk
+            chunk_metadata.extend([metadata[i]] * len(page_chunks))
         return chunks, chunk_metadata
 
     def get_vector_store(chunks, metadata):
@@ -235,71 +213,60 @@ def app2():
             response += "\n\nSources:\n" + "\n".join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/qna/{citation.split(' - ')[0]})" for citation in citations)
         return response
 
-    def main_app2():
-        st.set_page_config(page_title="Pastr Proposal Q&A")
-
-        # Automatically download and process PDFs from GitHub
-        with st.spinner("Downloading and processing PDFs..."):
-            pdf_docs = download_pdfs_from_github()
-            if pdf_docs:
-                raw_text, source_metadata = get_pdf_text(pdf_docs)
-                if raw_text:
-                    text_chunks, chunk_metadata = get_text_chunks(raw_text, source_metadata)
-                    if text_chunks:
-                        vector_store = load_or_create_vector_store(text_chunks, chunk_metadata)
-                        if vector_store:
-                            st.success("PDF processing complete")
-                        else:
-                            st.error("Failed to create vector store")
+    st.title("Pastr Proposal Q&A")
+    with st.spinner("Downloading and processing PDFs..."):
+        pdf_docs = download_pdfs_from_github()
+        if pdf_docs:
+            raw_text, source_metadata = get_pdf_text(pdf_docs)
+            if raw_text:
+                text_chunks, chunk_metadata = get_text_chunks(raw_text, source_metadata)
+                if text_chunks:
+                    vector_store = load_or_create_vector_store(text_chunks, chunk_metadata)
+                    if vector_store:
+                        st.success("PDF processing complete")
                     else:
-                        st.error("No text chunks created")
+                        st.error("Failed to create vector store")
                 else:
-                    st.error("No text extracted from PDFs")
+                    st.error("No text chunks created")
             else:
-                st.error("No PDFs downloaded")
+                st.error("No text extracted from PDFs")
+        else:
+            st.error("No PDFs downloaded")
 
-        # Main content area for displaying chat messages
-        st.title("Past Proposal Q&A")
-        st.write("Welcome to the chat!")
-        st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
+    st.write("Welcome to the chat!")
+    st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
 
-        # Chat input
-        if "messages" not in st.session_state.keys():
-            st.session_state.messages = [{"role": "assistant", "content": "Find and engage with past proposal questions and answers."}]
+    if "messages" not in st.session_state.keys():
+        st.session_state.messages = [{"role": "assistant", "content": "Find and engage with past proposal questions and answers."}]
 
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.write(message["content"])
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
 
-        if prompt := st.chat_input():
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.write(prompt)
+    if prompt := st.chat_input():
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.write(prompt)
 
-            # Split the prompt into smaller chunks and process each one
-            query_chunks = chunk_query(prompt)
-            full_response = ''
-            all_citations = []
+        query_chunks = chunk_query(prompt)
+        full_response = ''
+        all_citations = []
 
-            for chunk in query_chunks:
-                response = user_input(chunk)
-                for item in response['output_text']:
-                    full_response += item
-                all_citations.extend(response['citations'])
+        for chunk in query_chunks:
+            response = user_input(chunk)
+            for item in response['output_text']:
+                full_response += item
+            all_citations.extend(response['citations'])
 
-            modified_response = modify_response_language(full_response, all_citations)
+        modified_response = modify_response_language(full_response, all_citations)
 
-            with st.chat_message("assistant"):
-                st.write(modified_response)
-                st.session_state.messages.append({"role": "assistant", "content": modified_response})
-
-    main_app2()
+        with st.chat_message("assistant"):
+            st.write(modified_response)
+            st.session_state.messages.append({"role": "assistant", "content": modified_response})
 
 def app3():
     import os
-    import time
     import requests
-    from io import BytesIO
     from PyPDF2 import PdfReader
     from langchain.text_splitter import CharacterTextSplitter
     from langchain.embeddings import OpenAIEmbeddings
@@ -308,13 +275,10 @@ def app3():
     from openai import OpenAI
     from dotenv import load_dotenv
     from langchain.schema import Document
-    from datetime import datetime
-    import base64
 
     load_dotenv()
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-    # Initialize OpenAI client
     client = OpenAI(api_key=OPENAI_API_KEY)
 
     def get_pdfs_from_github():
@@ -364,7 +328,7 @@ def app3():
         for i, page_text in enumerate(text):
             page_chunks = splitter.split_text(page_text)
             chunks.extend(page_chunks)
-            chunk_metadata.extend([metadata[i]] * len(page_chunks))  # Assign correct metadata to each chunk
+            chunk_metadata.extend([metadata[i]] * len(page_chunks))
         return chunks, chunk_metadata
 
     def get_vector_store(chunks, metadata):
@@ -457,68 +421,59 @@ def app3():
         response = response.replace(" them ", " us ")
         response = response.replace("Them ", "Us ")
         if citations:
-            response += "\n\nSources:\n" + "\n".join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/docs/{citation.split(' - ')[0]})" for citation in citations)
+            response += "\n\nSources:\n" + "\n.join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/docs/{citation.split(' - ')[0]})" for citation in citations)
         return response
 
-    def main_app3():
-        st.set_page_config(page_title="Leverage Existing Proposal Content")
-
-        # Automatically download and process PDFs from GitHub
-        with st.spinner("Downloading and processing PDFs..."):
-            pdf_docs = download_pdfs_from_github()
-            if pdf_docs:
-                raw_text, source_metadata = get_pdf_text(pdf_docs)
-                if raw_text:
-                    text_chunks, chunk_metadata = get_text_chunks(raw_text, source_metadata)
-                    if text_chunks:
-                        vector_store = load_or_create_vector_store(text_chunks, chunk_metadata)
-                        if vector_store:
-                            st.success("PDF processing complete")
-                        else:
-                            st.error("Failed to create vector store")
+    st.title("Leverage Existing Proposal Content")
+    with st.spinner("Downloading and processing PDFs..."):
+        pdf_docs = download_pdfs_from_github()
+        if pdf_docs:
+            raw_text, source_metadata = get_pdf_text(pdf_docs)
+            if raw_text:
+                text_chunks, chunk_metadata = get_text_chunks(raw_text, source_metadata)
+                if text_chunks:
+                    vector_store = load_or_create_vector_store(text_chunks, chunk_metadata)
+                    if vector_store:
+                        st.success("PDF processing complete")
                     else:
-                        st.error("No text chunks created")
+                        st.error("Failed to create vector store")
                 else:
-                    st.error("No text extracted from PDFs")
+                    st.error("No text chunks created")
             else:
-                st.error("No PDFs downloaded")
+                st.error("No text extracted from PDFs")
+        else:
+            st.error("No PDFs downloaded")
 
-        # Main content area for displaying chat messages
-        st.title("Find and engage with past proposal content")
-        st.write("Welcome to the chat!")
-        st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
+    st.write("Welcome to the chat!")
+    st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
 
-        # Chat input
-        if "messages" not in st.session_state.keys():
-            st.session_state.messages = [{"role": "assistant", "content": "Find and engage with past Carnegie proposals."}]
+    if "messages" not in st.session_state.keys():
+        st.session_state.messages = [{"role": "assistant", "content": "Find and engage with past Carnegie proposals."}]
 
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.write(message["content"])
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
 
-        if prompt := st.chat_input():
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.write(prompt)
+    if prompt := st.chat_input():
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.write(prompt)
 
-            # Split the prompt into smaller chunks and process each one
-            query_chunks = chunk_query(prompt)
-            full_response = ''
-            all_citations = []
+        query_chunks = chunk_query(prompt)
+        full_response = ''
+        all_citations = []
 
-            for chunk in query_chunks:
-                response = user_input(chunk)
-                for item in response['output_text']:
-                    full_response += item
-                all_citations.extend(response['citations'])
+        for chunk in query_chunks:
+            response = user_input(chunk)
+            for item in response['output_text']:
+                full_response += item
+            all_citations.extend(response['citations'])
 
-            modified_response = modify_response_language(full_response, all_citations)
+        modified_response = modify_response_language(full_response, all_citations)
 
-            with st.chat_message("assistant"):
-                st.write(modified_response)
-                st.session_state.messages.append({"role": "assistant", "content": modified_response})
-
-    main_app3()
+        with st.chat_message("assistant"):
+            st.write(modified_response)
+            st.session_state.messages.append({"role": "assistant", "content": modified_response})
 
 # Main function to run the Streamlit app
 def main():
@@ -526,11 +481,11 @@ def main():
 
     # Define the tab menu
     selected = option_menu(
-        menu_title=None,  # required
-        options=["App1", "App2", "App3"],  # required
-        icons=["house", "gear", "list-task"],  # optional
-        menu_icon="cast",  # optional
-        default_index=0,  # optional
+        menu_title=None,
+        options=["App1", "App2", "App3"],
+        icons=["house", "gear", "list-task"],
+        menu_icon="cast",
+        default_index=0,
         orientation="horizontal",
     )
 
