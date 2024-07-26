@@ -82,9 +82,11 @@ def load_or_create_vector_store(chunks, metadata):
         try:
             embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
             vector_store = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
+            st.write("Vector store loaded successfully")
             return vector_store
         except Exception as e:
             st.error(f"Failed to load FAISS index: {e}")
+    st.write("Creating new vector store")
     return get_vector_store(chunks, metadata)
 
 def clear_chat_history():
@@ -101,6 +103,7 @@ def user_input(user_question, max_retries=5, delay=2):
         if not vector_store:
             raise ValueError("Vector store is not initialized.")
         docs = vector_store.similarity_search(user_question)
+        st.write(f"Found {len(docs)} documents matching the query.")
     except Exception as e:
         st.error(f"Failed to perform similarity search: {e}")
         return {"output_text": [f"Failed to perform similarity search: {e}"], "citations": []}
