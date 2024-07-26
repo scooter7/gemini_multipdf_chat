@@ -98,6 +98,8 @@ def user_input(user_question, max_retries=5, delay=2):
         return {"output_text": ["Failed to load or create the vector store."], "citations": []}
 
     try:
+        if not vector_store:
+            raise ValueError("Vector store is not initialized.")
         docs = vector_store.similarity_search(user_question)
     except Exception as e:
         st.error(f"Failed to perform similarity search: {e}")
