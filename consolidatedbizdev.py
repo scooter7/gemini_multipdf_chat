@@ -457,7 +457,7 @@ def app3():
         response = response.replace(" them ", " us ")
         response = response.replace("Them ", "Us ")
         if citations:
-            response += "\n\nSources:\n" + "\n.join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/docs/{citation.split(' - ')[0]})" for citation in citations)
+            response += "\n\nSources:\n" + "\n".join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/docs/{citation.split(' - ')[0]})" for citation in citations)
         return response
 
     def main_app3():
