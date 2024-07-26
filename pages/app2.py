@@ -115,13 +115,13 @@ def user_input(user_question, max_retries=5, delay=2):
     vector_store = load_or_create_vector_store([], [])
     if not vector_store:
         st.error("Failed to load or create the vector store.")
-        return {"output_text": ["Failed to load or create the vector store."]}
+        return {"output_text": ["Failed to load or create the vector store."], "citations": []}
 
     try:
         docs = vector_store.similarity_search(user_question)
     except Exception as e:
         st.error(f"Failed to perform similarity search: {e}")
-        return {"output_text": [f"Failed to perform similarity search: {e}"]}
+        return {"output_text": [f"Failed to perform similarity search: {e}"], "citations": []}
 
     model = get_conversational_chain()
     response_text = ""
@@ -151,7 +151,7 @@ def user_input(user_question, max_retries=5, delay=2):
                         delay *= 2  # Exponential backoff
                     else:
                         st.error(f"Failed to generate response: {e}")
-                        return {"output_text": [f"Failed to generate response: {e}"]}
+                        return {"output_text": [f"Failed to generate response: {e}"], "citations": []}
 
     return {"output_text": [response_text], "citations": citations}
 
