@@ -414,15 +414,15 @@ def app3():
         return [query[i:i+chunk_size] for i in range(0, len(query), chunk_size)]
 
     def modify_response_language(original_response, citations):
-        response = original_response.replace(" they ", " we ")
-        response = response.replace("They ", "We ")
-        response = response.replace(" their ", " our ")
-        response = response.replace("Their ", "Our ")
-        response = response.replace(" them ", " us ")
-        response = response.replace("Them ", "Us ")
-        if citations:
-            response += "\n\nSources:\n" + "\n.join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/docs/{citation.split(' - ')[0]})" for citation in citations)
-        return response
+    response = original_response.replace(" they ", " we ")
+    response = response.replace("They ", "We ")
+    response = response.replace(" their ", " our ")
+    response = response.replace("Their ", "Our ")
+    response = response.replace(" them ", " us ")
+    response = response.replace("Them ", "Us ")
+    if citations:
+        response += "\n\nSources:\n" + "\n".join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/docs/{citation.split(' - ')[0]})" for citation in citations)
+    return response
 
     st.title("Leverage Existing Proposal Content")
     with st.spinner("Downloading and processing PDFs..."):
