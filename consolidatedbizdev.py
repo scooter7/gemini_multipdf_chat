@@ -143,10 +143,6 @@ def modify_response_language_1(original_response, citations):
 
 
 def app1():
-    st.set_page_config(
-        page_title="Past Proposal Q&A",
-    )
-
     with st.spinner("Downloading and processing PDFs..."):
         pdf_docs = download_pdfs_from_github_1()
         if pdf_docs:
@@ -265,10 +261,6 @@ def user_input_2(user_question):
 
 
 def app2():
-    st.set_page_config(
-        page_title="RFP Summarization Bot",
-    )
-
     with st.sidebar:
         st.title("Menu:")
         pdf_docs = st.file_uploader(
@@ -421,10 +413,6 @@ def modify_response_language_3(original_response, citations):
 
 
 def app3():
-    st.set_page_config(
-        page_title="Leverage Existing Proposal Content",
-    )
-
     with st.spinner("Downloading and processing PDFs..."):
         pdf_docs = download_pdfs_from_github_3()
         if pdf_docs:
@@ -480,6 +468,7 @@ def app3():
 
 # Main App
 def main():
+    st.set_page_config(page_title="Combined Application", layout="wide")
     st.title("Combined Application")
     tab1, tab2, tab3 = st.tabs(["Tab 1: Past Proposal Q&A", "Tab 2: RFP Summarization Bot", "Tab 3: Leverage Existing Proposal Content"])
 
