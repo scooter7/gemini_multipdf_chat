@@ -1,7 +1,6 @@
 import os
 import time
 import requests
-from io import BytesIO
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
@@ -58,8 +57,7 @@ def get_pdf_text(pdf_docs):
 
 # Split text into chunks
 def get_text_chunks(text, metadata, chunk_size=2000, chunk_overlap=500):
-    splitter = CharacterTextSplitter(
-        chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     chunks = []
     chunk_metadata = []
     for i, page_text in enumerate(text):
@@ -97,13 +95,13 @@ def user_input(user_question, max_retries=5, delay=2):
     vector_store = load_or_create_vector_store([], [])
     if not vector_store:
         st.error("Failed to load or create the vector store.")
-        return {"output_text": ["Failed to load or create the vector store."]}
+        return {"output_text": ["Failed to load or create the vector store."], "citations": []}
 
     try:
         docs = vector_store.similarity_search(user_question)
     except Exception as e:
         st.error(f"Failed to perform similarity search: {e}")
-        return {"output_text": [f"Failed to perform similarity search: {e}"]}
+        return {"output_text": [f"Failed to perform similarity search: {e}"], "citations": []}
 
     response_text = ""
     citations = []
@@ -125,9 +123,7 @@ def modify_response_language(original_response, citations):
     return response
 
 def main():
-    st.set_page_config(
-        page_title="Pastr Proposal Q&A",
-    )
+    st.set_page_config(page_title="Pastr Proposal Q&A")
 
     # Automatically download and process PDFs from GitHub
     with st.spinner("Downloading and processing PDFs..."):
@@ -177,7 +173,7 @@ def main():
             response = user_input(chunk)
             for item in response['output_text']:
                 full_response += item
-            all_citations.extend(response['citations'])
+            all_citations.extend(response.get('citations', []))
 
         modified_response = modify_response_language(full_response, all_citations)
 
