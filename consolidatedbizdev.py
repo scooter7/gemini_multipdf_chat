@@ -69,13 +69,13 @@ if selected == "Welcome":
     st.write("Welcome to the Carnegie Business Development Suite! Please select an app from the sidebar.")
 elif selected == "App1":
     clear_chat_history()
-    import app1  # Assuming app1.py exists and defines a function main()
+    from pages import app1  # Assuming app1.py exists and defines a function main()
     app1.main()
 elif selected == "App2":
     clear_chat_history()
-    import app2  # Assuming app2.py exists and defines a function main()
+    from pages import app2  # Assuming app2.py exists and defines a function main()
     app2.main()
 elif selected == "App3":
     clear_chat_history()
-    import app3  # Assuming app3.py exists and defines a function main()
-    app3.main()
+    from pages import qna  # Assuming qna.py exists and defines a function main()
+    qna.main()
