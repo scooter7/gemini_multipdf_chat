@@ -23,8 +23,8 @@ def on_tab_change():
 # Set up navigation with option menu
 selected = option_menu(
     menu_title=None,
-    options=["Welcome", "App1", "App2", "App3"],
-    icons=["house", "file-earmark", "file-earmark", "file-earmark"],
+    options=["Welcome"],
+    icons=["house"],
     menu_icon="cast",
     default_index=0,
     orientation="horizontal",
