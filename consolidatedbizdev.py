@@ -6,9 +6,8 @@ st.set_page_config(
     page_icon="👋",
 )
 
-st.write("# Welcome to Carnegie's AI-Powered Business Development Suite! 👋")
-
-st.sidebar.success("Select one of the apps")
+st.sidebar.title("Navigation")
+selected = st.sidebar.radio("Go to", ["Welcome", "App", "App2", "QnA"])
 
 # Function to clear chat history
 def clear_chat_history():
@@ -53,20 +52,10 @@ def user_input(user_question, max_retries=5, delay=2):
 
     return {"output_text": [response_text], "citations": citations}
 
-# Set up navigation with option menu
-selected = option_menu(
-    menu_title=None,
-    options=["Welcome", "App", "App2", "QnA"],
-    icons=["house", "file-earmark", "file-earmark", "file-earmark"],
-    menu_icon="cast",
-    default_index=0,
-    orientation="horizontal",
-    key="tab_selection"
-)
-
 # Main content area
 if selected == "Welcome":
-    st.write("Welcome to the Carnegie Business Development Suite! Please select an app from the sidebar.")
+    st.write("# Welcome to Carnegie's AI-Powered Business Development Suite! 👋")
+    st.write("Please select an app from the sidebar.")
 elif selected == "App":
     clear_chat_history()
     from pages import app  # Assuming app.py exists and defines a function main()
