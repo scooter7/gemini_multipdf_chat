@@ -20,18 +20,6 @@ def on_tab_change():
     clear_chat_history()
     st.experimental_rerun()
 
-# Set up navigation with option menu
-selected = option_menu(
-    menu_title=None,
-    options=["Welcome", "App1", "App2", "App3"],
-    icons=["house", "file-earmark", "file-earmark", "file-earmark"],
-    menu_icon="cast",
-    default_index=0,
-    orientation="horizontal",
-    key="tab_selection",
-    on_change=on_tab_change
-)
-
 # Main content area
 if selected == "Welcome":
     st.write("Welcome to the Carnegie Business Development Suite! Please select an app from the sidebar.")
