@@ -29,7 +29,6 @@ selected = option_menu(
     default_index=0,
     orientation="horizontal",
     key="tab_selection",
-    on_change=on_tab_change
 )
 
 # Main content area
