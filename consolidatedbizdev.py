@@ -6,9 +6,6 @@ st.set_page_config(
     page_icon="👋",
 )
 
-st.sidebar.title("Navigation")
-selected = st.sidebar.radio("Go to", ["Welcome", "App", "App2", "QnA"])
-
 # Function to clear chat history
 def clear_chat_history():
     if "messages" in st.session_state:
