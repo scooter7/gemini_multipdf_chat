@@ -54,6 +54,11 @@ def get_conversational_chain():
     chain = load_qa_chain(llm=model, chain_type="stuff", prompt=prompt)
     return chain
 
+def clear_chat_history():
+    st.session_state.messages = [
+        {"role": "assistant", "content": "Upload an RFP and ask about scope, due dates, anything you'd like..."}
+    ]
+
 def main():
     st.set_page_config(page_title="RFP Summarization Bot")
 
