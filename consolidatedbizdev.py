@@ -67,15 +67,15 @@ selected = option_menu(
 # Main content area
 if selected == "Welcome":
     st.write("Welcome to the Carnegie Business Development Suite! Please select an app from the sidebar.")
-elif selected == "App1":
+elif selected == "App":
     clear_chat_history()
-    from pages import app1  # Assuming app1.py exists and defines a function main()
+    from pages import app  # Assuming app1.py exists and defines a function main()
     app1.main()
 elif selected == "App2":
     clear_chat_history()
     from pages import app2  # Assuming app2.py exists and defines a function main()
     app2.main()
-elif selected == "App3":
+elif selected == "qna":
     clear_chat_history()
     from pages import qna  # Assuming qna.py exists and defines a function main()
     qna.main()
