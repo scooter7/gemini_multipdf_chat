@@ -56,7 +56,7 @@ def user_input(user_question, max_retries=5, delay=2):
 # Set up navigation with option menu
 selected = option_menu(
     menu_title=None,
-    options=["Welcome", "App1", "App2", "App3"],
+    options=["Welcome", "App", "App2", "QnA"],
     icons=["house", "file-earmark", "file-earmark", "file-earmark"],
     menu_icon="cast",
     default_index=0,
@@ -69,13 +69,13 @@ if selected == "Welcome":
     st.write("Welcome to the Carnegie Business Development Suite! Please select an app from the sidebar.")
 elif selected == "App":
     clear_chat_history()
-    from pages import app  # Assuming app1.py exists and defines a function main()
-    app1.main()
+    from pages import app  # Assuming app.py exists and defines a function main()
+    app.main()
 elif selected == "App2":
     clear_chat_history()
     from pages import app2  # Assuming app2.py exists and defines a function main()
     app2.main()
-elif selected == "qna":
+elif selected == "QnA":
     clear_chat_history()
     from pages import qna  # Assuming qna.py exists and defines a function main()
     qna.main()
