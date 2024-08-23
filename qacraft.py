@@ -9,8 +9,11 @@ from dotenv import load_dotenv
 from langchain.schema import Document
 import re
 
-load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# Load the OpenAI API key from Streamlit secrets
+OPENAI_API_KEY = st.secrets.get("openai_api_key")
+
+if not OPENAI_API_KEY:
+    st.error("OpenAI API key is missing. Please add it to Streamlit secrets.")
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github(repo, folder):
@@ -182,7 +185,7 @@ def user_input(user_question, max_retries=5, delay=2):
     """
     prompt = prompt_template.format(context=response_text, question=user_question)
     
-    completion = client.chat.completions.create(
+    completion = openai.ChatCompletion.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},
