@@ -90,7 +90,7 @@ def load_or_create_vector_store(chunks, metadata, index_name):
 
 def clear_chat_history():
     st.session_state.messages = [
-        {"role": "assistant", "content": "Find and engage with past proposal questions and answers while using Carnegie's tone and style to respond to new Q&A requests."}]
+        {"role": "assistant", "content": "Find and engage with past proposal questions and answers."}]
 
 def blend_styles(factual_text, style_text):
     # Tone adjustments - making the language more professional, authoritative, and empowering
@@ -146,9 +146,18 @@ def user_input(user_question, max_retries=5, delay=2):
 
     return {"output_text": [final_response_text], "citations": citations}
 
+def chunk_query(query, chunk_size=200):
+    return [query[i:i+chunk_size] for i in range(0, len(query), chunk_size)]
+
+def modify_response_language(original_response, citations):
+    response = original_response
+    if citations:
+        response += "\n\nSources:\n" + "\n".join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/qna/{citation.split(' - ')[0]})" for citation in citations)
+    return response
+
 def main():
     st.set_page_config(
-        page_title="Q&A Crafter",
+        page_title="Past Proposal Q&A",
     )
 
     with st.spinner("Downloading and processing PDFs..."):
@@ -178,13 +187,13 @@ def main():
         else:
             st.error("No PDFs downloaded")
 
-    st.title("Q&A Crafter")
-    st.write("Find and engage with past proposal questions and answers while using Carnegie's tone and style to respond to new Q&A requests.")
+    st.title("Past Proposal Q&A")
+    st.write("Welcome to the chat!")
     st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
 
     if "messages" not in st.session_state.keys():
         st.session_state.messages = [
-            {"role": "assistant", "content": "Find and engage with past proposal questions and answers while using Carnegie's tone and style to respond to new Q&A requests."}]
+            {"role": "assistant", "content": "Find and engage with past proposal questions and answers."}]
 
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
