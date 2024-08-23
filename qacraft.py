@@ -8,13 +8,9 @@ from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 from langchain.schema import Document
 import re
-import openai
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# Initialize OpenAI API
-openai.api_key = OPENAI_API_KEY
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github(repo, folder):
@@ -67,8 +63,11 @@ def get_text_chunks(text, metadata, chunk_size=2000, chunk_overlap=500):
     chunk_metadata = []
     for i, page_text in enumerate(text):
         page_chunks = splitter.split_text(page_text)
-        chunks.extend(page_chunks)
-        chunk_metadata.extend([metadata[i]] * len(page_chunks))  # Assign correct metadata to each chunk
+        if page_chunks:  # Ensure that the chunking is working
+            chunks.extend(page_chunks)
+            chunk_metadata.extend([metadata[i]] * len(page_chunks))  # Assign correct metadata to each chunk
+        else:
+            st.warning(f"No chunks created for page {i+1} in {metadata[i]['source']}")
     return chunks, chunk_metadata
 
 # Get embeddings for each chunk
@@ -193,7 +192,7 @@ def user_input(user_question, max_retries=5, delay=2):
         temperature=0.7,
     )
 
-    final_response_text = completion.choices[0].message["content"].strip()
+    final_response_text = completion.choices[0].message["content"]
 
     return {"output_text": [final_response_text], "citations": citations}
 
