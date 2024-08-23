@@ -1,5 +1,4 @@
 import os
-import time
 import requests
 from io import BytesIO
 from PyPDF2 import PdfReader
@@ -9,9 +8,11 @@ import streamlit as st
 from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 from langchain.schema import Document
+import openai
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+openai.api_key = OPENAI_API_KEY
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github(folder_url):
@@ -93,6 +94,36 @@ def clear_chat_history():
     st.session_state.messages = [
         {"role": "assistant", "content": "Find and engage with past proposal questions and answers."}]
 
+def rephrase_with_style(text, writing_style):
+    # Construct a prompt that reflects the desired tone, structure, and style
+    prompt = f"""Rephrase the following content to match the tone, structure, and style of the provided writing sample:
+    
+    Original Content:
+    {text}
+    
+    Writing Style Guidelines:
+    - Professional and authoritative
+    - Engaging and conversational
+    - Detailed and descriptive
+    - Structured with emphasis on key points
+    - Client-centric and solution-oriented
+    
+    Writing Sample for Reference:
+    {writing_style}
+    
+    Please ensure the response is structured, detailed, and directly addresses the questions or concerns raised in the original content, using a conversational and engaging tone."""
+    
+    # Use OpenAI API to generate the response
+    response = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=prompt,
+        max_tokens=1500,
+        temperature=0.7,
+        n=1,
+        stop=None
+    )
+    return response.choices[0].text.strip()
+
 def user_input(user_question, writing_style, max_retries=5, delay=2):
     vector_store = load_or_create_vector_store([], [])
     if not vector_store:
@@ -117,21 +148,6 @@ def user_input(user_question, writing_style, max_retries=5, delay=2):
 
     return {"output_text": [response_text], "citations": citations}
 
-def rephrase_with_style(text, writing_style):
-    # Implement OpenAI or other rephrasing method to adjust the response style
-    # For example, using OpenAI with a prompt to rephrase in the style of writing_style
-    prompt = f"Rephrase the following text in the style of the provided writing sample:\n\n{text}\n\nStyle:\n{writing_style}"
-    # Use OpenAI API to generate the response
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=prompt,
-        max_tokens=1500,
-        temperature=0.7,
-        n=1,
-        stop=None
-    )
-    return response.choices[0].text.strip()
-
 def chunk_query(query, chunk_size=200):
     # Split the query into chunks
     return [query[i:i+chunk_size] for i in range(0, len(query), chunk_size)]
@@ -146,6 +162,8 @@ def main():
     st.set_page_config(
         page_title="Past Proposal Q&A",
     )
+
+    writing_style = None  # Initialize the variable here
 
     # Automatically download and process PDFs from GitHub
     with st.spinner("Downloading and processing PDFs..."):
@@ -176,7 +194,7 @@ def main():
         if website_pdf_docs:
             website_text, _ = get_pdf_text(website_pdf_docs)
             if website_text:
-                writing_style = " ".join(website_text)
+                writing_style = " ".join(website_text)  # Assign the writing style here
                 st.success("Writing Style PDF processing complete")
             else:
                 st.error("No text extracted from Writing Style PDF")
@@ -208,10 +226,13 @@ def main():
         all_citations = []
 
         for chunk in query_chunks:
-            response = user_input(chunk, writing_style)
-            for item in response['output_text']:
-                full_response += item
-            all_citations.extend(response['citations'])
+            if writing_style:
+                response = user_input(chunk, writing_style)
+                for item in response['output_text']:
+                    full_response += item
+                all_citations.extend(response['citations'])
+            else:
+                st.error("Writing style not loaded, unable to generate response.")
 
         modified_response = modify_response_language(full_response, all_citations)
 
