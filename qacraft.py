@@ -15,11 +15,10 @@ load_dotenv()
 # Load the OpenAI API key from Streamlit secrets
 OPENAI_API_KEY = st.secrets["openai_api_key"]["api_key"]
 
-# Debugging print statement to check the type of OPENAI_API_KEY
-st.write(f"API Key Type: {type(OPENAI_API_KEY)}")
-
-if not isinstance(OPENAI_API_KEY, str):
-    st.error("The API key is not a string. Please check the secrets configuration.")
+# Set the page configuration before any other Streamlit commands
+st.set_page_config(
+    page_title="Past Proposal Q&A",
+)
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github(repo, folder):
@@ -188,14 +187,10 @@ def chunk_query(query, chunk_size=200):
 def modify_response_language(original_response, citations):
     response = original_response
     if citations:
-        response += "\n\nSources:\n" + "\n".join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/qna/{citation.split(' - ')[0]})" for citation in citations)
+        response += "\n\nSources:\n" + "\n.join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/qna/{citation.split(' - ')[0]})" for citation in citations)
     return response
 
 def main():
-    st.set_page_config(
-        page_title="Past Proposal Q&A",
-    )
-
     with st.spinner("Downloading and processing PDFs..."):
         factual_docs = download_pdfs_from_github("scooter7/gemini_multipdf_chat", "qna")
         style_docs = download_pdfs_from_github("scooter7/gemini_multipdf_chat", "Website")
