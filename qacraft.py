@@ -1,5 +1,7 @@
 import os
+import time
 import requests
+from io import BytesIO
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
@@ -7,22 +9,13 @@ import streamlit as st
 from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 from langchain.schema import Document
-import re
 
-# Load environment variables
 load_dotenv()
-
-# Load the OpenAI API key from Streamlit secrets
-OPENAI_API_KEY = st.secrets["openai_api_key"]["api_key"]
-
-# Set the page configuration before any other Streamlit commands
-st.set_page_config(
-    page_title="Past Proposal Q&A",
-)
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Function to get list of PDFs from GitHub repository
-def get_pdfs_from_github(repo, folder):
-    api_url = f"https://api.github.com/repos/{repo}/contents/{folder}"
+def get_pdfs_from_github(folder_url):
+    api_url = folder_url.replace("github.com", "api.github.com/repos").replace("tree/main", "contents")
     headers = {"Accept": "application/vnd.github.v3+json"}
     response = requests.get(api_url, headers=headers)
     if response.status_code == 200:
@@ -34,8 +27,8 @@ def get_pdfs_from_github(repo, folder):
         return []
 
 # Function to download PDF files from the GitHub repository
-def download_pdfs_from_github(repo, folder):
-    pdf_urls = get_pdfs_from_github(repo, folder)
+def download_pdfs_from_github(folder_url):
+    pdf_urls = get_pdfs_from_github(folder_url)
     pdf_docs = []
     for url in pdf_urls:
         response = requests.get(url)
@@ -71,99 +64,43 @@ def get_text_chunks(text, metadata, chunk_size=2000, chunk_overlap=500):
     chunk_metadata = []
     for i, page_text in enumerate(text):
         page_chunks = splitter.split_text(page_text)
-        if page_chunks:  # Ensure that the chunking is working
-            chunks.extend(page_chunks)
-            chunk_metadata.extend([metadata[i]] * len(page_chunks))  # Assign correct metadata to each chunk
-        else:
-            st.warning(f"No chunks created for page {i+1} in {metadata[i]['source']}")
+        chunks.extend(page_chunks)
+        chunk_metadata.extend([metadata[i]] * len(page_chunks))  # Assign correct metadata to each chunk
     return chunks, chunk_metadata
 
 # Get embeddings for each chunk
-def get_vector_store(chunks, metadata, index_name):
+def get_vector_store(chunks, metadata):
     if not chunks:
         st.error("No text chunks available for embedding")
         return None
     embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
     documents = [Document(page_content=chunk, metadata=metadata[i]) for i, chunk in enumerate(chunks)]
     vector_store = FAISS.from_documents(documents, embedding=embeddings)
-    vector_store.save_local(index_name)
+    vector_store.save_local("faiss_index")
     return vector_store
 
-def load_or_create_vector_store(chunks, metadata, index_name):
-    if os.path.exists(index_name):
+def load_or_create_vector_store(chunks, metadata):
+    if os.path.exists("faiss_index"):
         try:
             embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
-            vector_store = FAISS.load_local(index_name, embeddings, allow_dangerous_deserialization=True)
+            vector_store = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
             return vector_store
         except Exception as e:
             st.error(f"Failed to load FAISS index: {e}")
-    return get_vector_store(chunks, metadata, index_name)
+    return get_vector_store(chunks, metadata)
 
 def clear_chat_history():
     st.session_state.messages = [
         {"role": "assistant", "content": "Find and engage with past proposal questions and answers."}]
 
-def blend_styles(factual_text, style_text):
-    # Tone adjustments - making the language more professional, authoritative, and empowering
-    tone_mapping = {
-        r'\bwe\b': 'our team',
-        r'\byou\b': 'your organization',
-        r'\bdo not\b': "don't",
-        r'\bcannot\b': "can't",
-        r'\bwill\b': 'shall',
-        r'\bare\b': 'are likely to',
-        r'\bshould\b': 'might consider',
-        r'\bis\b': 'is generally regarded as',
-        r'\bwe\b': 'we’ll work together to',
-        r'\byour\b': 'your tailored solution',
-    }
-    
-    # Apply tone adjustments
-    for pattern, replacement in tone_mapping.items():
-        factual_text = re.sub(pattern, replacement, factual_text, flags=re.IGNORECASE)
-
-    # Adding collaborative language and strategic word choices
-    factual_text = re.sub(r'\bsolution\b', 'customized solution', factual_text, flags=re.IGNORECASE)
-    factual_text = re.sub(r'\bdata\b', 'intelligent data', factual_text, flags=re.IGNORECASE)
-    factual_text = re.sub(r'\bmarket\b', 'key market', factual_text, flags=re.IGNORECASE)
-
-    # Example - Breaking down long sentences to match a more concise style, but also combining where necessary for complexity
-    sentences = re.split(r'(?<=[.!?]) +', factual_text)
-    complex_factual_text = ""
-    for sentence in sentences:
-        if len(sentence.split()) > 20:  # Example threshold for long sentences
-            parts = re.split(r',|\band\b|\bor\b', sentence)
-            complex_factual_text += ' '.join(parts) + ". "
-        else:
-            complex_factual_text += sentence + " "
-
-    # Adding stylistic elements from the style text if present
-    stylistic_elements = {
-        'introduction': re.search(r'(introduction.*?)(\n|$)', style_text, re.IGNORECASE),
-        'conclusion': re.search(r'(conclusion.*?)(\n|$)', style_text, re.IGNORECASE)
-    }
-
-    if stylistic_elements['introduction']:
-        introduction = stylistic_elements['introduction'].group(1)
-        complex_factual_text = f"{introduction}\n\n{complex_factual_text}"
-
-    if stylistic_elements['conclusion']:
-        conclusion = stylistic_elements['conclusion'].group(1)
-        complex_factual_text += f"\n\n{conclusion}"
-
-    return complex_factual_text.strip()
-
-def user_input(user_question, max_retries=5, delay=2):
-    factual_store = load_or_create_vector_store([], [], "faiss_index_factual")
-    style_store = load_or_create_vector_store([], [], "faiss_index_style")
-    
-    if not factual_store or not style_store:
+def user_input(user_question, writing_style, max_retries=5, delay=2):
+    vector_store = load_or_create_vector_store([], [])
+    if not vector_store:
         st.error("Failed to load or create the vector store.")
         return {"output_text": ["Failed to load or create the vector store."]}
 
     try:
-        factual_docs = factual_store.similarity_search(user_question)
-        style_docs = style_store.similarity_search(user_question)
+        docs = vector_store.similarity_search(user_question)
     except Exception as e:
         st.error(f"Failed to perform similarity search: {e}")
         return {"output_text": [f"Failed to perform similarity search: {e}"]}
@@ -171,17 +108,32 @@ def user_input(user_question, max_retries=5, delay=2):
     response_text = ""
     citations = []
 
-    for doc in factual_docs:
+    for doc in docs:
         response_text += doc.page_content + "\n\n"
         citations.append(doc.metadata['source'])
 
-    # Blend in the style elements
-    for style_doc in style_docs:
-        response_text = blend_styles(response_text, style_doc.page_content)
+    # Modify the response style based on the writing style document
+    response_text = rephrase_with_style(response_text, writing_style)
 
     return {"output_text": [response_text], "citations": citations}
 
+def rephrase_with_style(text, writing_style):
+    # Implement OpenAI or other rephrasing method to adjust the response style
+    # For example, using OpenAI with a prompt to rephrase in the style of writing_style
+    prompt = f"Rephrase the following text in the style of the provided writing sample:\n\n{text}\n\nStyle:\n{writing_style}"
+    # Use OpenAI API to generate the response
+    response = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=prompt,
+        max_tokens=1500,
+        temperature=0.7,
+        n=1,
+        stop=None
+    )
+    return response.choices[0].text.strip()
+
 def chunk_query(query, chunk_size=200):
+    # Split the query into chunks
     return [query[i:i+chunk_size] for i in range(0, len(query), chunk_size)]
 
 def modify_response_language(original_response, citations):
@@ -191,37 +143,52 @@ def modify_response_language(original_response, citations):
     return response
 
 def main():
+    st.set_page_config(
+        page_title="Past Proposal Q&A",
+    )
+
+    # Automatically download and process PDFs from GitHub
     with st.spinner("Downloading and processing PDFs..."):
-        factual_docs = download_pdfs_from_github("scooter7/gemini_multipdf_chat", "qna")
-        style_docs = download_pdfs_from_github("scooter7/gemini_multipdf_chat", "Website")
-        
-        if factual_docs and style_docs:
-            raw_factual_text, factual_metadata = get_pdf_text(factual_docs)
-            raw_style_text, style_metadata = get_pdf_text(style_docs)
+        qna_folder_url = "https://github.com/scooter7/gemini_multipdf_chat/tree/main/qna"
+        website_folder_url = "https://github.com/scooter7/gemini_multipdf_chat/tree/main/Website"
 
-            if raw_factual_text and raw_style_text:
-                factual_chunks, factual_chunk_metadata = get_text_chunks(raw_factual_text, factual_metadata)
-                style_chunks, style_chunk_metadata = get_text_chunks(raw_style_text, style_metadata)
-
-                if factual_chunks and style_chunks:
-                    factual_store = load_or_create_vector_store(factual_chunks, factual_chunk_metadata, "faiss_index_factual")
-                    style_store = load_or_create_vector_store(style_chunks, style_chunk_metadata, "faiss_index_style")
-                    
-                    if factual_store and style_store:
-                        st.success("PDF processing complete")
+        # Process QnA PDFs
+        qna_pdf_docs = download_pdfs_from_github(qna_folder_url)
+        if qna_pdf_docs:
+            raw_text, source_metadata = get_pdf_text(qna_pdf_docs)
+            if raw_text:
+                text_chunks, chunk_metadata = get_text_chunks(raw_text, source_metadata)
+                if text_chunks:
+                    vector_store = load_or_create_vector_store(text_chunks, chunk_metadata)
+                    if vector_store:
+                        st.success("QnA PDF processing complete")
                     else:
                         st.error("Failed to create vector store")
                 else:
                     st.error("No text chunks created")
             else:
-                st.error("No text extracted from PDFs")
+                st.error("No text extracted from QnA PDFs")
         else:
-            st.error("No PDFs downloaded")
+            st.error("No QnA PDFs downloaded")
 
+        # Process Writing Style PDF
+        website_pdf_docs = download_pdfs_from_github(website_folder_url)
+        if website_pdf_docs:
+            website_text, _ = get_pdf_text(website_pdf_docs)
+            if website_text:
+                writing_style = " ".join(website_text)
+                st.success("Writing Style PDF processing complete")
+            else:
+                st.error("No text extracted from Writing Style PDF")
+        else:
+            st.error("No Writing Style PDF downloaded")
+
+    # Main content area for displaying chat messages
     st.title("Past Proposal Q&A")
     st.write("Welcome to the chat!")
     st.sidebar.button('Clear Chat History', on_click=clear_chat_history)
 
+    # Chat input
     if "messages" not in st.session_state.keys():
         st.session_state.messages = [
             {"role": "assistant", "content": "Find and engage with past proposal questions and answers."}]
@@ -235,12 +202,13 @@ def main():
         with st.chat_message("user"):
             st.write(prompt)
 
+        # Split the prompt into smaller chunks and process each one
         query_chunks = chunk_query(prompt)
         full_response = ''
         all_citations = []
 
         for chunk in query_chunks:
-            response = user_input(chunk)
+            response = user_input(chunk, writing_style)
             for item in response['output_text']:
                 full_response += item
             all_citations.extend(response['citations'])
