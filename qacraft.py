@@ -113,6 +113,10 @@ def user_input(user_question, faq_text, style_text):
         st.error(f"Error interacting with Gemini: {getattr(response, 'finish_reason', 'Unknown error')}")
         return ""
 
+def clear_chat_history():
+    st.session_state.messages = [
+        {"role": "assistant", "content": "Find and engage with past proposal questions and answers."}]
+
 def main():
     st.set_page_config(page_title="Past Proposal Q&A")
 
