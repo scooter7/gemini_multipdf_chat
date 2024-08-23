@@ -103,44 +103,21 @@ def blend_styles(factual_text, style_text):
         r'\bare\b': 'are likely to',
         r'\bshould\b': 'might consider',
         r'\bis\b': 'is generally regarded as',
-        r'\bwe\b': 'we’ll work together to',
-        r'\byour\b': 'your tailored solution',
     }
     
     # Apply tone adjustments
     for pattern, replacement in tone_mapping.items():
         factual_text = re.sub(pattern, replacement, factual_text, flags=re.IGNORECASE)
-
-    # Adding collaborative language and strategic word choices
+    
+    # Avoiding repetition by ensuring concise language
     factual_text = re.sub(r'\bsolution\b', 'customized solution', factual_text, flags=re.IGNORECASE)
     factual_text = re.sub(r'\bdata\b', 'intelligent data', factual_text, flags=re.IGNORECASE)
     factual_text = re.sub(r'\bmarket\b', 'key market', factual_text, flags=re.IGNORECASE)
-
-    # Example - Breaking down long sentences to match a more concise style, but also combining where necessary for complexity
-    sentences = re.split(r'(?<=[.!?]) +', factual_text)
-    complex_factual_text = ""
-    for sentence in sentences:
-        if len(sentence.split()) > 20:  # Example threshold for long sentences
-            parts = re.split(r',|\band\b|\bor\b', sentence)
-            complex_factual_text += ' '.join(parts) + ". "
-        else:
-            complex_factual_text += sentence + " "
-
-    # Adding stylistic elements from the style text if present
-    stylistic_elements = {
-        'introduction': re.search(r'(introduction.*?)(\n|$)', style_text, re.IGNORECASE),
-        'conclusion': re.search(r'(conclusion.*?)(\n|$)', style_text, re.IGNORECASE)
-    }
-
-    if stylistic_elements['introduction']:
-        introduction = stylistic_elements['introduction'].group(1)
-        complex_factual_text = f"{introduction}\n\n{complex_factual_text}"
-
-    if stylistic_elements['conclusion']:
-        conclusion = stylistic_elements['conclusion'].group(1)
-        complex_factual_text += f"\n\n{conclusion}"
-
-    return complex_factual_text.strip()
+    
+    # Removing any redundant or repetitive phrases that may have been added
+    factual_text = re.sub(r'(\b\w+\b)( \1\b)+', r'\1', factual_text)
+    
+    return factual_text.strip()
 
 def user_input(user_question, max_retries=5, delay=2):
     factual_store = load_or_create_vector_store([], [], "faiss_index_factual")
@@ -151,33 +128,23 @@ def user_input(user_question, max_retries=5, delay=2):
         return {"output_text": ["Failed to load or create the vector store."]}
 
     try:
+        # Retrieve the most relevant factual content
         factual_docs = factual_store.similarity_search(user_question)
+        factual_response_text = factual_docs[0].page_content if factual_docs else "No relevant content found."
+        
+        # Retrieve the stylistic guidance
         style_docs = style_store.similarity_search(user_question)
+        style_guide_text = style_docs[0].page_content if style_docs else ""
     except Exception as e:
         st.error(f"Failed to perform similarity search: {e}")
         return {"output_text": [f"Failed to perform similarity search: {e}"]}
 
-    response_text = ""
-    citations = []
+    # Blend factual response with stylistic elements
+    final_response_text = blend_styles(factual_response_text, style_guide_text)
 
-    for doc in factual_docs:
-        response_text += doc.page_content + "\n\n"
-        citations.append(doc.metadata['source'])
+    citations = [doc.metadata['source'] for doc in factual_docs] if factual_docs else []
 
-    # Blend in the style elements
-    for style_doc in style_docs:
-        response_text = blend_styles(response_text, style_doc.page_content)
-
-    return {"output_text": [response_text], "citations": citations}
-
-def chunk_query(query, chunk_size=200):
-    return [query[i:i+chunk_size] for i in range(0, len(query), chunk_size)]
-
-def modify_response_language(original_response, citations):
-    response = original_response
-    if citations:
-        response += "\n\nSources:\n" + "\n".join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/qna/{citation.split(' - ')[0]})" for citation in citations)
-    return response
+    return {"output_text": [final_response_text], "citations": citations}
 
 def main():
     st.set_page_config(
