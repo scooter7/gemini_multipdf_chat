@@ -8,14 +8,14 @@ import streamlit as st
 from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 from langchain.schema import Document
-from openai_client import GPT4OMiniClient  # Assuming a custom client for GPT-4o-mini
+import openai  # Import the official OpenAI library
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
-# Initialize GPT-4o-mini client
-client = GPT4OMiniClient(api_key=OPENAI_API_KEY)
+# Initialize the OpenAI client
+openai.api_key = OPENAI_API_KEY
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github(folder_url):
@@ -101,14 +101,14 @@ def clear_chat_history():
         {"role": "assistant", "content": "Find and engage with past proposal questions and answers."}]
 
 def rephrase_with_style(text, writing_style):
-    # Construct a message for GPT-4o-mini client
+    # Construct a message for GPT-4o-mini
     messages = [
         {"role": "system", "content": "You are a highly skilled assistant who helps rewrite content in a specific tone and style."},
         {"role": "user", "content": f"Original Content: {text}\n\nWriting Style: {writing_style}\n\nPlease rewrite the content above using the provided writing style."}
     ]
     
-    # Generate the response using GPT-4o-mini
-    completion = client.chat.completions.create(
+    # Generate the response using GPT-4o-mini via OpenAI API
+    completion = openai.ChatCompletion.create(
         messages=messages,
         model="gpt-4o-mini",
         max_tokens=1500,
