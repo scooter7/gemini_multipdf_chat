@@ -187,7 +187,7 @@ def chunk_query(query, chunk_size=200):
 def modify_response_language(original_response, citations):
     response = original_response
     if citations:
-        response += "\n\nSources:\n" + "\n.join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/qna/{citation.split(' - ')[0]})" for citation in citations)
+        response += "\n\nSources:\n" + "\n".join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/qna/{citation.split(' - ')[0]})" for citation in citations)
     return response
 
 def main():
