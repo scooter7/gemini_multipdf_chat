@@ -8,12 +8,14 @@ import streamlit as st
 from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 from langchain.schema import Document
-import openai
+from openai_client import GPT4OMiniClient  # Assuming a custom client for GPT-4o-mini
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-openai.api_key = OPENAI_API_KEY
+
+# Initialize GPT-4o-mini client
+client = GPT4OMiniClient(api_key=OPENAI_API_KEY)
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github(folder_url):
@@ -99,34 +101,21 @@ def clear_chat_history():
         {"role": "assistant", "content": "Find and engage with past proposal questions and answers."}]
 
 def rephrase_with_style(text, writing_style):
-    # Construct a prompt that reflects the desired tone, structure, and style
-    prompt = f"""Rephrase the following content to match the tone, structure, and style of the provided writing sample:
+    # Construct a message for GPT-4o-mini client
+    messages = [
+        {"role": "system", "content": "You are a highly skilled assistant who helps rewrite content in a specific tone and style."},
+        {"role": "user", "content": f"Original Content: {text}\n\nWriting Style: {writing_style}\n\nPlease rewrite the content above using the provided writing style."}
+    ]
     
-    Original Content:
-    {text}
-    
-    Writing Style Guidelines:
-    - Professional and authoritative
-    - Engaging and conversational
-    - Detailed and descriptive
-    - Structured with emphasis on key points
-    - Client-centric and solution-oriented
-    
-    Writing Sample for Reference:
-    {writing_style}
-    
-    Please ensure the response is structured, detailed, and directly addresses the questions or concerns raised in the original content, using a conversational and engaging tone."""
-    
-    # Use OpenAI API to generate the response
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=prompt,
+    # Generate the response using GPT-4o-mini
+    completion = client.chat.completions.create(
+        messages=messages,
+        model="gpt-4o-mini",
         max_tokens=1500,
-        temperature=0.7,
-        n=1,
-        stop=None
+        temperature=0.7
     )
-    return response.choices[0].text.strip()
+    
+    return completion.choices[0].message['content'].strip()
 
 def user_input(user_question, writing_style, max_retries=5, delay=2):
     vector_store = load_or_create_vector_store([], [])
