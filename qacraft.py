@@ -93,7 +93,7 @@ def clear_chat_history():
         {"role": "assistant", "content": "Find and engage with past proposal questions and answers."}]
 
 def blend_styles(factual_text, style_text):
-    # Tone adjustments - making the language more professional, authoritative, and empowering
+    # Tone adjustments - making the language more professional, authoritative, and concise
     tone_mapping = {
         r'\bwe\b': 'our team',
         r'\byou\b': 'your organization',
@@ -103,21 +103,30 @@ def blend_styles(factual_text, style_text):
         r'\bare\b': 'are likely to',
         r'\bshould\b': 'might consider',
         r'\bis\b': 'is generally regarded as',
+        r'\bwe\b': 'we’ll work together to',
+        r'\byour\b': 'your tailored solution',
     }
     
     # Apply tone adjustments
     for pattern, replacement in tone_mapping.items():
         factual_text = re.sub(pattern, replacement, factual_text, flags=re.IGNORECASE)
     
-    # Avoiding repetition by ensuring concise language
-    factual_text = re.sub(r'\bsolution\b', 'customized solution', factual_text, flags=re.IGNORECASE)
-    factual_text = re.sub(r'\bdata\b', 'intelligent data', factual_text, flags=re.IGNORECASE)
-    factual_text = re.sub(r'\bmarket\b', 'key market', factual_text, flags=re.IGNORECASE)
+    # Avoid repetition and irrelevant content by keeping it concise and focused
+    factual_text = re.sub(r'(\b\w+\b)( \1\b)+', r'\1', factual_text)  # Remove repetitive words
+    factual_text = re.sub(r'\s+', ' ', factual_text).strip()  # Remove excessive spaces
     
-    # Removing any redundant or repetitive phrases that may have been added
-    factual_text = re.sub(r'(\b\w+\b)( \1\b)+', r'\1', factual_text)
+    # Use style text to adjust tone, but ensure content remains on-topic
+    if style_text:
+        style_sentences = re.split(r'(?<=[.!?]) +', style_text)
+        for sentence in style_sentences:
+            if len(sentence.split()) > 3:  # Avoid very short or incomplete sentences
+                factual_text += f" {sentence.strip()}"
+
+    # Final cleanup to ensure response is clean and makes sense
+    final_response = re.sub(r'\b(\w+)[’\']ve\b', r'\1 have', factual_text)  # Correct contractions
+    final_response = re.sub(r'\b(\w+)[’\']re\b', r'\1 are', final_response)
     
-    return factual_text.strip()
+    return final_response.strip()
 
 def user_input(user_question, max_retries=5, delay=2):
     factual_store = load_or_create_vector_store([], [], "faiss_index_factual")
@@ -129,11 +138,11 @@ def user_input(user_question, max_retries=5, delay=2):
 
     try:
         # Retrieve the most relevant factual content
-        factual_docs = factual_store.similarity_search(user_question)
+        factual_docs = factual_store.similarity_search(user_question, k=1)  # Focus on top 1 result for relevance
         factual_response_text = factual_docs[0].page_content if factual_docs else "No relevant content found."
         
         # Retrieve the stylistic guidance
-        style_docs = style_store.similarity_search(user_question)
+        style_docs = style_store.similarity_search(user_question, k=1)  # Top 1 result
         style_guide_text = style_docs[0].page_content if style_docs else ""
     except Exception as e:
         st.error(f"Failed to perform similarity search: {e}")
