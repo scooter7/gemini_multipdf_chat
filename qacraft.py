@@ -2,15 +2,23 @@ import os
 import requests
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
 import streamlit as st
 from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 from langchain.schema import Document
 import re
+import google.generativeai as genai
 
+# Load environment variables
 load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+genai_api_key = st.secrets.get("google_gen_ai", {}).get("api_key", None)
+
+# Check API Key
+if not genai_api_key:
+    st.error("Google Gemini API key is missing.")
+else:
+    # Initialize Google Gemini with API Key
+    genai.configure(api_key=genai_api_key)
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github(repo, folder):
@@ -92,6 +100,7 @@ def clear_chat_history():
     st.session_state.messages = [
         {"role": "assistant", "content": "Find and engage with past proposal questions and answers."}]
 
+# Function to blend styles from the FAQ and website documents
 def blend_styles(factual_text, style_text):
     # Tone adjustments - making the language more professional, authoritative, and concise
     tone_mapping = {
@@ -128,6 +137,7 @@ def blend_styles(factual_text, style_text):
     
     return final_response.strip()
 
+# Function to generate a response using Google Gemini
 def user_input(user_question, max_retries=5, delay=2):
     factual_store = load_or_create_vector_store([], [], "faiss_index_factual")
     style_store = load_or_create_vector_store([], [], "faiss_index_style")
@@ -150,6 +160,16 @@ def user_input(user_question, max_retries=5, delay=2):
 
     # Blend factual response with stylistic elements
     final_response_text = blend_styles(factual_response_text, style_guide_text)
+
+    # Generate a response using Google Gemini
+    model = genai.GenerativeModel("gemini-pro")
+    chat = model.start_chat(history=[])
+    response = chat.send_message(final_response_text)
+
+    if hasattr(response, 'text'):
+        final_response_text = response.text
+    else:
+        st.error(f"Error interacting with Gemini: {getattr(response, 'finish_reason', 'Unknown error')}")
 
     citations = [doc.metadata['source'] for doc in factual_docs] if factual_docs else []
 
