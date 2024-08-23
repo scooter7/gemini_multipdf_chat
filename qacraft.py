@@ -12,12 +12,16 @@ import openai
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 openai.api_key = OPENAI_API_KEY
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github(folder_url):
     api_url = folder_url.replace("github.com", "api.github.com/repos").replace("tree/main", "contents")
-    headers = {"Accept": "application/vnd.github.v3+json"}
+    headers = {
+        "Accept": "application/vnd.github.v3+json",
+        "Authorization": f"token {GITHUB_TOKEN}"
+    }
     response = requests.get(api_url, headers=headers)
     if response.status_code == 200:
         files = response.json()
