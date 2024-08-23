@@ -1,11 +1,8 @@
 import os
 import requests
 from PyPDF2 import PdfReader
-from langchain.text_splitter import CharacterTextSplitter
 import streamlit as st
-from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
-from langchain.schema import Document
 import re
 import google.generativeai as genai
 
@@ -63,43 +60,6 @@ def get_pdf_text(pdf_docs):
                 st.warning(f"Failed to extract text from page in {pdf}")
     return text, source_metadata
 
-# Split text into chunks
-def get_text_chunks(text, metadata, chunk_size=2000, chunk_overlap=500):
-    splitter = CharacterTextSplitter(
-        chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-    chunks = []
-    chunk_metadata = []
-    for i, page_text in enumerate(text):
-        page_chunks = splitter.split_text(page_text)
-        chunks.extend(page_chunks)
-        chunk_metadata.extend([metadata[i]] * len(page_chunks))  # Assign correct metadata to each chunk
-    return chunks, chunk_metadata
-
-# Get embeddings for each chunk
-def get_vector_store(chunks, metadata, index_name):
-    if not chunks:
-        st.error("No text chunks available for embedding")
-        return None
-    embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
-    documents = [Document(page_content=chunk, metadata=metadata[i]) for i, chunk in enumerate(chunks)]
-    vector_store = FAISS.from_documents(documents, embedding=embeddings)
-    vector_store.save_local(index_name)
-    return vector_store
-
-def load_or_create_vector_store(chunks, metadata, index_name):
-    if os.path.exists(index_name):
-        try:
-            embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
-            vector_store = FAISS.load_local(index_name, embeddings, allow_dangerous_deserialization=True)
-            return vector_store
-        except Exception as e:
-            st.error(f"Failed to load FAISS index: {e}")
-    return get_vector_store(chunks, metadata, index_name)
-
-def clear_chat_history():
-    st.session_state.messages = [
-        {"role": "assistant", "content": "Find and engage with past proposal questions and answers."}]
-
 # Function to blend styles from the FAQ and website documents
 def blend_styles(factual_text, style_text):
     # Tone adjustments - making the language more professional, authoritative, and concise
@@ -138,56 +98,23 @@ def blend_styles(factual_text, style_text):
     return final_response.strip()
 
 # Function to generate a response using Google Gemini
-def user_input(user_question, max_retries=5, delay=2):
-    factual_store = load_or_create_vector_store([], [], "faiss_index_factual")
-    style_store = load_or_create_vector_store([], [], "faiss_index_style")
-    
-    if not factual_store or not style_store:
-        st.error("Failed to load or create the vector store.")
-        return {"output_text": ["Failed to load or create the vector store."]}
-
-    try:
-        # Retrieve the most relevant factual content
-        factual_docs = factual_store.similarity_search(user_question, k=1)  # Focus on top 1 result for relevance
-        factual_response_text = factual_docs[0].page_content if factual_docs else "No relevant content found."
-        
-        # Retrieve the stylistic guidance
-        style_docs = style_store.similarity_search(user_question, k=1)  # Top 1 result
-        style_guide_text = style_docs[0].page_content if style_docs else ""
-    except Exception as e:
-        st.error(f"Failed to perform similarity search: {e}")
-        return {"output_text": [f"Failed to perform similarity search: {e}"]}
-
-    # Blend factual response with stylistic elements
-    final_response_text = blend_styles(factual_response_text, style_guide_text)
+def user_input(user_question, faq_text, style_text):
+    # Blend factual content with stylistic elements
+    blended_text = blend_styles(faq_text, style_text)
 
     # Generate a response using Google Gemini
     model = genai.GenerativeModel("gemini-pro")
     chat = model.start_chat(history=[])
-    response = chat.send_message(final_response_text)
+    response = chat.send_message(blended_text)
 
     if hasattr(response, 'text'):
-        final_response_text = response.text
+        return response.text
     else:
         st.error(f"Error interacting with Gemini: {getattr(response, 'finish_reason', 'Unknown error')}")
-
-    citations = [doc.metadata['source'] for doc in factual_docs] if factual_docs else []
-
-    return {"output_text": [final_response_text], "citations": citations}
-
-def chunk_query(query, chunk_size=200):
-    return [query[i:i+chunk_size] for i in range(0, len(query), chunk_size)]
-
-def modify_response_language(original_response, citations):
-    response = original_response
-    if citations:
-        response += "\n\nSources:\n" + "\n".join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/qna/{citation.split(' - ')[0]})" for citation in citations)
-    return response
+        return ""
 
 def main():
-    st.set_page_config(
-        page_title="Past Proposal Q&A",
-    )
+    st.set_page_config(page_title="Past Proposal Q&A")
 
     with st.spinner("Downloading and processing PDFs..."):
         factual_docs = download_pdfs_from_github("scooter7/gemini_multipdf_chat", "qna")
@@ -198,19 +125,9 @@ def main():
             raw_style_text, style_metadata = get_pdf_text(style_docs)
 
             if raw_factual_text and raw_style_text:
-                factual_chunks, factual_chunk_metadata = get_text_chunks(raw_factual_text, factual_metadata)
-                style_chunks, style_chunk_metadata = get_text_chunks(raw_style_text, style_metadata)
-
-                if factual_chunks and style_chunks:
-                    factual_store = load_or_create_vector_store(factual_chunks, factual_chunk_metadata, "faiss_index_factual")
-                    style_store = load_or_create_vector_store(style_chunks, style_chunk_metadata, "faiss_index_style")
-                    
-                    if factual_store and style_store:
-                        st.success("PDF processing complete")
-                    else:
-                        st.error("Failed to create vector store")
-                else:
-                    st.error("No text chunks created")
+                faq_text = " ".join(raw_factual_text)  # Combine all the factual text into one string
+                style_text = " ".join(raw_style_text)  # Combine all the style text into one string
+                st.success("PDF processing complete")
             else:
                 st.error("No text extracted from PDFs")
         else:
@@ -233,21 +150,12 @@ def main():
         with st.chat_message("user"):
             st.write(prompt)
 
-        query_chunks = chunk_query(prompt)
-        full_response = ''
-        all_citations = []
-
-        for chunk in query_chunks:
-            response = user_input(chunk)
-            for item in response['output_text']:
-                full_response += item
-            all_citations.extend(response['citations'])
-
-        modified_response = modify_response_language(full_response, all_citations)
+        # Generate the response using Google Gemini and display it
+        final_response = user_input(prompt, faq_text, style_text)
 
         with st.chat_message("assistant"):
-            st.write(modified_response)
-            st.session_state.messages.append({"role": "assistant", "content": modified_response})
+            st.write(final_response)
+            st.session_state.messages.append({"role": "assistant", "content": final_response})
 
 if __name__ == "__main__":
     main()
