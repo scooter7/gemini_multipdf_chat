@@ -9,11 +9,17 @@ from dotenv import load_dotenv
 from langchain.schema import Document
 import re
 
-# Load the OpenAI API key from Streamlit secrets
-OPENAI_API_KEY = st.secrets.get("openai_api_key")
+# Load environment variables
+load_dotenv()
 
-if not OPENAI_API_KEY:
-    st.error("OpenAI API key is missing. Please add it to Streamlit secrets.")
+# Load the OpenAI API key from Streamlit secrets
+OPENAI_API_KEY = st.secrets["openai_api_key"]["api_key"]
+
+# Debugging print statement to check the type of OPENAI_API_KEY
+st.write(f"API Key Type: {type(OPENAI_API_KEY)}")
+
+if not isinstance(OPENAI_API_KEY, str):
+    st.error("The API key is not a string. Please check the secrets configuration.")
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github(repo, folder):
@@ -174,30 +180,7 @@ def user_input(user_question, max_retries=5, delay=2):
     for style_doc in style_docs:
         response_text = blend_styles(response_text, style_doc.page_content)
 
-    # Generate a response using OpenAI's gpt-4o-mini
-    prompt_template = """
-    Answer the question as detailed as possible from the provided context, make sure to provide all the details. If the answer is not in
-    provided context, just say, "answer is not available in the context", don't provide the wrong answer.\n\n
-    Context:\n{context}\n
-    Question: \n{question}\n
-
-    Answer:
-    """
-    prompt = prompt_template.format(context=response_text, question=user_question)
-    
-    completion = openai.ChatCompletion.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=500,
-        temperature=0.7,
-    )
-
-    final_response_text = completion.choices[0].message["content"]
-
-    return {"output_text": [final_response_text], "citations": citations}
+    return {"output_text": [response_text], "citations": citations}
 
 def chunk_query(query, chunk_size=200):
     return [query[i:i+chunk_size] for i in range(0, len(query), chunk_size)]
