@@ -108,7 +108,7 @@ def rephrase_with_style(text, writing_style):
     ]
     
     # Generate the response using GPT-4o-mini via OpenAI API
-    completion = openai.ChatCompletion.create(
+    completion = client.chat.completions.create(
         messages=messages,
         model="gpt-4o-mini",
         max_tokens=1500,
