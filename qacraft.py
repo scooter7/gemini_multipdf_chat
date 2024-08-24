@@ -8,14 +8,15 @@ import streamlit as st
 from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 from langchain.schema import Document
+from openai import OpenAI  # Import the OpenAI client if this is custom
 
 # Load environment variables
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
-# Initialize the OpenAI client
-client = SomeOpenAIClient(api_key=OPENAI_API_KEY)  # Replace `SomeOpenAIClient` with the actual client class
+# Initialize OpenAI client
+client = OpenAI(api_key=OPENAI_API_KEY)  # Assuming OpenAI is the correct client
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github(folder_url):
