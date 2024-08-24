@@ -116,7 +116,8 @@ def rephrase_with_style(text, writing_style):
         temperature=0.7
     )
     
-    return completion.choices[0].message['content'].strip()
+    # Access the message content directly from the `message` object
+    return completion.choices[0].message.content.strip()
 
 def user_input(user_question, writing_style, max_retries=5, delay=2):
     vector_store = load_or_create_vector_store([], [])
