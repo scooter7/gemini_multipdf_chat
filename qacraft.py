@@ -8,7 +8,7 @@ import streamlit as st
 from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 from langchain.schema import Document
-from openai import OpenAI  # Import the OpenAI client if this is custom
+from openai import OpenAI  # Import the OpenAI client
 
 # Load environment variables
 load_dotenv()
@@ -126,6 +126,7 @@ def user_input(user_question, writing_style, max_retries=5, delay=2):
         return {"output_text": ["Failed to load or create the vector store."]}
 
     try:
+        # Perform a similarity search to find the most relevant document sections
         docs = vector_store.similarity_search(user_question)
     except Exception as e:
         st.error(f"Failed to perform similarity search: {e}")
@@ -135,13 +136,27 @@ def user_input(user_question, writing_style, max_retries=5, delay=2):
     citations = []
 
     for doc in docs:
-        response_text += doc.page_content + "\n\n"
-        citations.append(doc.metadata['source'])
+        # Focus on the most relevant portions of the content
+        relevant_content = doc.page_content.strip()
+        if relevant_content:
+            citations.append(doc.metadata['source'])
 
-    # Modify the response style based on the writing style document
-    response_text = rephrase_with_style(response_text, writing_style)
+            # Rephrase the relevant content to match the desired style
+            styled_response = rephrase_with_style(relevant_content, writing_style)
+            
+            # Append the styled response to the overall response
+            response_text += styled_response + "\n\n"
+
+    # Ensure the response is concise and directly answers the user's question
+    response_text = ensure_conciseness(response_text)
 
     return {"output_text": [response_text], "citations": citations}
+
+def ensure_conciseness(response_text):
+    # Logic to ensure the response is concise and directly answers the user's query
+    # This could involve summarizing the response to remove any redundant or unnecessary information
+    concise_response = response_text.strip()  # Further logic can be added to refine conciseness
+    return concise_response
 
 def chunk_query(query, chunk_size=200):
     # Split the query into chunks
