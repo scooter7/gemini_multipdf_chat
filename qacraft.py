@@ -16,7 +16,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 # Initialize OpenAI client
-client = OpenAI(api_key=OPENAI_API_KEY)  # Assuming OpenAI is the correct client
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github(folder_url):
@@ -105,14 +105,14 @@ def rephrase_with_style(text, writing_style):
     # Construct a message for GPT-4o-mini
     messages = [
         {"role": "system", "content": "You are a highly skilled assistant who helps rewrite content in a specific tone and style."},
-        {"role": "user", "content": f"Original Content: {text}\n\nWriting Style: {writing_style}\n\nPlease rewrite the content above using the provided writing style."}
+        {"role": "user", "content": f"Original Content: {text}\n\nWriting Style: {writing_style}\n\nPlease rewrite the content above using the provided writing style, ensuring conciseness and direct relevance to the question."}
     ]
     
     # Generate the response using the correct client syntax
     completion = client.chat.completions.create(
         model="gpt-4o-mini",  # Use the correct model identifier
         messages=messages,
-        max_tokens=1500,
+        max_tokens=500,  # Limit tokens to ensure concise responses
         temperature=0.7
     )
     
@@ -146,6 +146,9 @@ def user_input(user_question, writing_style, max_retries=5, delay=2):
             
             # Append the styled response to the overall response
             response_text += styled_response + "\n\n"
+            
+            # Stop after finding a relevant answer
+            break
 
     # Ensure the response is concise and directly answers the user's question
     response_text = ensure_conciseness(response_text)
