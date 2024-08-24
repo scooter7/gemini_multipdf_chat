@@ -8,14 +8,14 @@ import streamlit as st
 from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 from langchain.schema import Document
-import openai  # Import the official OpenAI library
 
+# Load environment variables
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 # Initialize the OpenAI client
-openai.api_key = OPENAI_API_KEY
+client = SomeOpenAIClient(api_key=OPENAI_API_KEY)  # Replace `SomeOpenAIClient` with the actual client class
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github(folder_url):
@@ -107,10 +107,10 @@ def rephrase_with_style(text, writing_style):
         {"role": "user", "content": f"Original Content: {text}\n\nWriting Style: {writing_style}\n\nPlease rewrite the content above using the provided writing style."}
     ]
     
-    # Generate the response using GPT-4o-mini via OpenAI API
+    # Generate the response using the correct client syntax
     completion = client.chat.completions.create(
+        model="gpt-4o-mini",  # Use the correct model identifier
         messages=messages,
-        model="gpt-4o-mini",
         max_tokens=1500,
         temperature=0.7
     )
