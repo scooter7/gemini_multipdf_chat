@@ -7,17 +7,11 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
 import streamlit as st
 from langchain_community.vectorstores import FAISS
-from openai import OpenAI
 from dotenv import load_dotenv
 from langchain.schema import Document
-from datetime import datetime
-import base64
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# Initialize OpenAI client
-client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github():
@@ -95,18 +89,6 @@ def load_or_create_vector_store(chunks, metadata):
             st.error(f"Failed to load FAISS index: {e}")
     return get_vector_store(chunks, metadata)
 
-def get_conversational_chain():
-    prompt_template = """
-    Answer the question as detailed as possible from the provided context, make sure to provide all the details, if the answer is not in
-    provided context just say, "answer is not available in the context", don't provide the wrong answer\n\n
-    Context:\n {context}?\n
-    Question: \n{question}\n
-
-    Answer:
-    """
-    model = "gpt-4o-mini"
-    return model
-
 def clear_chat_history():
     st.session_state.messages = [
         {"role": "assistant", "content": "Find and engage with past proposal questions and answers."}]
@@ -123,35 +105,12 @@ def user_input(user_question, max_retries=5, delay=2):
         st.error(f"Failed to perform similarity search: {e}")
         return {"output_text": [f"Failed to perform similarity search: {e}"]}
 
-    model = get_conversational_chain()
     response_text = ""
     citations = []
 
     for doc in docs:
-        context = doc.page_content
-        context_chunks = get_text_chunks([context], [doc.metadata])
-
-        for chunk, meta in zip(context_chunks[0], context_chunks[1]):
-            for attempt in range(max_retries):
-                try:
-                    completion = client.chat.completions.create(
-                        model=model,
-                        messages=[
-                            {"role": "system", "content": "You specialize in leveraging the PDF content in the repository to find and discuss information from these documents."},
-                            {"role": "user", "content": f"Context: {chunk}\n\nQuestion: {user_question}"}
-                        ]
-                    )
-                    response_text += completion.choices[0].message.content + " "
-                    citations.append(meta['source'])
-                    break
-                except Exception as e:
-                    if 'Resource has been exhausted' in str(e):
-                        st.warning(f"API quota has been exhausted. Retrying in {delay} seconds...")
-                        time.sleep(delay)
-                        delay *= 2  # Exponential backoff
-                    else:
-                        st.error(f"Failed to generate response: {e}")
-                        return {"output_text": [f"Failed to generate response: {e}"]}
+        response_text += doc.page_content + "\n\n"
+        citations.append(doc.metadata['source'])
 
     return {"output_text": [response_text], "citations": citations}
 
@@ -160,12 +119,7 @@ def chunk_query(query, chunk_size=200):
     return [query[i:i+chunk_size] for i in range(0, len(query), chunk_size)]
 
 def modify_response_language(original_response, citations):
-    response = original_response.replace(" they ", " we ")
-    response = response.replace("They ", "We ")
-    response = response.replace(" their ", " our ")
-    response = response.replace("Their ", "Our ")
-    response = response.replace(" them ", " us ")
-    response = response.replace("Them ", "Us ")
+    response = original_response
     if citations:
         response += "\n\nSources:\n" + "\n".join(f"- [{citation}](https://github.com/scooter7/gemini_multipdf_chat/blob/main/qna/{citation.split(' - ')[0]})" for citation in citations)
     return response
