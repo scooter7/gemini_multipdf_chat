@@ -9,14 +9,23 @@ from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 from langchain.schema import Document
 from openai import OpenAI  # Import the OpenAI client
+from googleapiclient.discovery import build  # Import the Google Custom Search API client
 
 # Load environment variables
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+GOOGLE_CSE_API_KEY = os.getenv("GOOGLE_CSE_API_KEY")
+GOOGLE_CSE_CX = os.getenv("GOOGLE_CSE_CX")
 
 # Initialize OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
+
+# Initialize Google Custom Search API client
+def google_search(query):
+    service = build("customsearch", "v1", developerKey=GOOGLE_CSE_API_KEY)
+    result = service.cse().list(q=query, cx=GOOGLE_CSE_CX).execute()
+    return result['items'] if 'items' in result else []
 
 # Function to get list of PDFs from GitHub repository
 def get_pdfs_from_github(folder_url):
@@ -176,12 +185,9 @@ def main():
         page_title="Past Proposal Q&A",
     )
 
-    writing_style = None  # Initialize the variable here
-
     # Automatically download and process PDFs from GitHub
     with st.spinner("Downloading and processing PDFs..."):
         qna_folder_url = "https://github.com/scooter7/gemini_multipdf_chat/tree/main/qna"
-        website_folder_url = "https://github.com/scooter7/gemini_multipdf_chat/tree/main/Website"
 
         # Process QnA PDFs
         qna_pdf_docs = download_pdfs_from_github(qna_folder_url)
@@ -202,17 +208,17 @@ def main():
         else:
             st.error("No QnA PDFs downloaded")
 
-        # Process Writing Style PDF
-        website_pdf_docs = download_pdfs_from_github(website_folder_url)
-        if website_pdf_docs:
-            website_text, _ = get_pdf_text(website_pdf_docs)
-            if website_text:
-                writing_style = " ".join(website_text)  # Assign the writing style here
-                st.success("Writing Style PDF processing complete")
-            else:
-                st.error("No text extracted from Writing Style PDF")
+    # Set up the writing style by querying the Google Custom Search API
+    with st.spinner("Fetching writing style from Carnegie website..."):
+        search_query = "site:https://www.carnegiehighered.com/solutions/ OR site:https://www.carnegiehighered.com/services/"
+        search_results = google_search(search_query)
+
+        if search_results:
+            writing_style = " ".join(item['snippet'] for item in search_results)
+            st.success("Writing style fetched successfully")
         else:
-            st.error("No Writing Style PDF downloaded")
+            st.error("Failed to fetch writing style from Carnegie website")
+            writing_style = None
 
     # Main content area for displaying chat messages
     st.title("Past Proposal Q&A")
