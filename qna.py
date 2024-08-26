@@ -1,5 +1,4 @@
 import os
-import time
 import requests
 from io import BytesIO
 from PyPDF2 import PdfReader
@@ -13,51 +12,28 @@ from langchain.schema import Document
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# Function to get list of PDFs from GitHub repository
-def get_pdfs_from_github():
-    api_url = "https://api.github.com/repos/scooter7/gemini_multipdf_chat/contents/qna"
-    headers = {"Accept": "application/vnd.github.v3+json"}
-    response = requests.get(api_url, headers=headers)
+# Function to download and read a specific PDF from GitHub
+def get_specific_pdf_text(pdf_url):
+    response = requests.get(pdf_url)
     if response.status_code == 200:
-        files = response.json()
-        pdf_files = [file['download_url'] for file in files if file['name'].endswith('.pdf')]
-        return pdf_files
+        pdf_reader = PdfReader(BytesIO(response.content))
+        text = []
+        for page_num, page in enumerate(pdf_reader.pages):
+            page_text = page.extract_text()
+            if page_text:
+                text.append(page_text)
+            else:
+                st.warning(f"Failed to extract text from page {page_num + 1} in the PDF.")
+        return text
     else:
-        st.error(f"Failed to fetch list of PDF files from GitHub: {response.status_code}")
+        st.error(f"Failed to download the PDF from {pdf_url}: {response.status_code}")
         return []
-
-# Function to download PDF files from the GitHub repository
-def download_pdfs_from_github():
-    pdf_urls = get_pdfs_from_github()
-    pdf_docs = []
-    for url in pdf_urls:
-        response = requests.get(url)
-        if response.status_code == 200:
-            file_name = url.split('/')[-1]
-            with open(file_name, 'wb') as f:
-                f.write(response.content)
-            pdf_docs.append(file_name)
-        else:
-            st.error(f"Failed to download {url}")
-    return pdf_docs
-
-# Read specific pdf file and return text
-def get_specific_pdf_text(pdf_name):
-    text = []
-    pdf_reader = PdfReader(pdf_name)
-    for page_num, page in enumerate(pdf_reader.pages):
-        page_text = page.extract_text()
-        if page_text:
-            text.append(page_text)
-        else:
-            st.warning(f"Failed to extract text from page in {pdf_name}")
-    return text
 
 # Split text into chunks
 def get_text_chunks(text, chunk_size=2000, chunk_overlap=500):
     splitter = CharacterTextSplitter(
         chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-    return splitter.split_text(text)
+    return splitter.split_text(" ".join(text))
 
 # Get embeddings for each chunk
 def get_vector_store(chunks):
@@ -116,28 +92,25 @@ def main():
         page_title="Past Proposal Q&A",
     )
 
-    # Automatically download and process PDFs from GitHub
     with st.spinner("Downloading and processing PDFs..."):
-        pdf_docs = download_pdfs_from_github()
-        if pdf_docs:
-            # Load facts from Carnegie RFP FAQ PDF
-            rfp_faq_text = get_specific_pdf_text("Carnegie RFP standard content_FAQ.pdf")
-            if rfp_faq_text:
-                fact_chunks = get_text_chunks(" ".join(rfp_faq_text))
-                vector_store = load_or_create_vector_store(fact_chunks)
-                if vector_store:
-                    st.success("PDF processing complete")
-                else:
-                    st.error("Failed to create vector store")
+        # Load facts from Carnegie RFP FAQ PDF
+        rfp_faq_url = "https://github.com/scooter7/gemini_multipdf_chat/raw/main/qna/Carnegie%20RFP%20standard%20content_FAQ.pdf"
+        rfp_faq_text = get_specific_pdf_text(rfp_faq_url)
+        if rfp_faq_text:
+            fact_chunks = get_text_chunks(rfp_faq_text)
+            vector_store = load_or_create_vector_store(fact_chunks)
+            if vector_store:
+                st.success("PDF processing complete")
             else:
-                st.error("No text extracted from the RFP FAQ PDF")
-
-            # Load writing style from Carnegie web copy PDF
-            web_copy_text = get_specific_pdf_text("carnegiewebcopy.pdf")
-            if not web_copy_text:
-                st.error("Failed to load the writing style from the web copy PDF")
+                st.error("Failed to create vector store")
         else:
-            st.error("No PDFs downloaded")
+            st.error("No text extracted from the RFP FAQ PDF")
+
+        # Load writing style from Carnegie web copy PDF
+        web_copy_url = "https://github.com/scooter7/gemini_multipdf_chat/raw/main/qna/carnegiewebcopy.pdf"
+        web_copy_text = get_specific_pdf_text(web_copy_url)
+        if not web_copy_text:
+            st.error("Failed to load the writing style from the web copy PDF")
 
     # Main content area for displaying chat messages
     st.title("Past Proposal Q&A")
