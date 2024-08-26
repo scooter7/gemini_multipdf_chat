@@ -8,31 +8,34 @@ import streamlit as st
 from langchain_community.vectorstores import FAISS
 from dotenv import load_dotenv
 from langchain.schema import Document
+import time
 
 load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # Function to download and read a specific PDF from GitHub
 def get_specific_pdf_text(pdf_url):
-    response = requests.get(pdf_url)
-    if response.status_code == 200:
+    try:
+        response = requests.get(pdf_url, timeout=10)  # Add timeout
+        response.raise_for_status()  # Raise an error for bad responses
         pdf_reader = PdfReader(BytesIO(response.content))
         text = []
         for page_num, page in enumerate(pdf_reader.pages):
+            if page_num >= 5:  # Limit to the first 5 pages for testing
+                break
             page_text = page.extract_text()
             if page_text:
                 text.append(page_text)
             else:
                 st.warning(f"Failed to extract text from page {page_num + 1} in the PDF.")
         return text
-    else:
-        st.error(f"Failed to download the PDF from {pdf_url}: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error downloading PDF: {e}")
         return []
 
 # Split text into chunks
 def get_text_chunks(text, chunk_size=2000, chunk_overlap=500):
-    splitter = CharacterTextSplitter(
-        chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    splitter = CharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     return splitter.split_text(" ".join(text))
 
 # Get embeddings for each chunk
@@ -40,11 +43,15 @@ def get_vector_store(chunks):
     if not chunks:
         st.error("No text chunks available for embedding")
         return None
-    embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
-    documents = [Document(page_content=chunk) for chunk in chunks]
-    vector_store = FAISS.from_documents(documents, embedding=embeddings)
-    vector_store.save_local("faiss_index")
-    return vector_store
+    try:
+        embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
+        documents = [Document(page_content=chunk) for chunk in chunks]
+        vector_store = FAISS.from_documents(documents, embedding=embeddings)
+        vector_store.save_local("faiss_index")
+        return vector_store
+    except Exception as e:
+        st.error(f"Failed to create vector store: {e}")
+        return None
 
 def load_or_create_vector_store(chunks):
     if os.path.exists("faiss_index"):
@@ -63,6 +70,8 @@ def clear_chat_history():
 def user_input(user_question, vector_store):
     try:
         docs = vector_store.similarity_search(user_question)
+        if not docs:
+            return {"output_text": ["No relevant documents found."], "citations": []}
     except Exception as e:
         st.error(f"Failed to perform similarity search: {e}")
         return {"output_text": [f"Failed to perform similarity search: {e}"]}
@@ -88,9 +97,7 @@ def modify_response_language(original_response, citations):
     return response
 
 def main():
-    st.set_page_config(
-        page_title="Past Proposal Q&A",
-    )
+    st.set_page_config(page_title="Past Proposal Q&A")
 
     with st.spinner("Downloading and processing PDFs..."):
         # Load facts from Carnegie RFP FAQ PDF
@@ -103,14 +110,17 @@ def main():
                 st.success("PDF processing complete")
             else:
                 st.error("Failed to create vector store")
+                return
         else:
             st.error("No text extracted from the RFP FAQ PDF")
+            return
 
         # Load writing style from Carnegie web copy PDF
         web_copy_url = "https://github.com/scooter7/gemini_multipdf_chat/raw/main/qna/carnegiewebcopy.pdf"
         web_copy_text = get_specific_pdf_text(web_copy_url)
         if not web_copy_text:
             st.error("Failed to load the writing style from the web copy PDF")
+            return
 
     # Main content area for displaying chat messages
     st.title("Past Proposal Q&A")
